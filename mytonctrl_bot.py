@@ -130,18 +130,26 @@ def GetValidatorStatus(adnlAddr):
 	outOfSync = data.get("outOfSync")
 	efficiency = data.get("efficiency")
 	isValidator = data.get("isValidator")
-	if outOfSync and outOfSync < 300 and efficiency and efficiency > 10:
-		status = True
-	elif outOfSync is None and efficiency and efficiency > 10:
-		status = True
-	elif efficiency is None and outOfSync and outOfSync < 300:
-		status = True
-	elif efficiency is None:
+	# Если у нас нету данных по эффективности, или нода не валидатор
+	if efficiency is None or isValidator is False:
 		status = None
-	else:
-		status = False
-	if isValidator is False:
-		status = None
+	# Если нода отправляет телеметрию
+	elif outOfSync is not None:
+		# Если рассинхронизация > 300, или эффективность < 10, или нода не работает
+		if outOfSync > 300 or efficiency < 10 or isWorking is False:
+			status = False
+		else:
+			status = True
+	# Если нода не отправляет телеметрию
+	elif outOfSync is None:
+		# Если эффективность < 10
+		if efficiency < 10:
+			status = False
+		else:
+			status = True
+	#end if
+
+	# Set status icon
 	if status is True:
 		statusIcon = "✅"
 	elif status is False:
@@ -556,13 +564,13 @@ def ScanUserValidators(userId):
 			if adnlAddr in userAlarmList:
 				userAlarmList.remove(adnlAddr)
 				output = "`[Info]`" + '\n'
-				output += f"The validator `...{adnlEnding}` ({label}) has restarted {statusIcon}"
+				output += f"The validator `...{adnlEnding} ({label})` has restarted {statusIcon}"
 				AddMessage(userId, output)
 		elif status is False:
 			if adnlAddr not in userAlarmList:
 				userAlarmList.append(adnlAddr)
 				output = "`[Alarm]`" + '\n'
-				output += f"The validator `...{adnlEnding}` ({label}) went down {statusIcon}"
+				output += f"The validator `...{adnlEnding} ({label})` went down {statusIcon}"
 				AddMessage(userId, output)
 		#end if
 #end define
