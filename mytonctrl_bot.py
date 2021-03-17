@@ -524,7 +524,7 @@ def ScanUserValidators(userId):
 				output = "`[Info]`" + '\n'
 				output += f"The validator `...{adnlEnding}` has restarted {statusIcon}"
 				AddMessage(userId, output)
-		else:
+		elif status is False:
 			if adnlAddr not in userAlarmList:
 				userAlarmList.append(adnlAddr)
 				output = "`[Alarm]`" + '\n'
