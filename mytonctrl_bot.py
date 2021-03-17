@@ -555,22 +555,26 @@ def ScanUserValidators(userId):
 	userAlarmList = GetUserAlarmList(userId)
 	# print("ScanUserValidators.data:", json.dumps(data))
 	for item in data:
-		label = item.get("label", "")
+		label = item.get("label")
 		status = item.get("status")
 		adnlAddr = item.get("adnlAddr")
 		adnlEnding = item.get("adnlEnding")
 		statusIcon = item.get("statusIcon")
+		if label:
+			labelText = f" ({label})"
+		else:
+			labelText = ""
 		if status is True:
 			if adnlAddr in userAlarmList:
 				userAlarmList.remove(adnlAddr)
 				output = "`[Info]`" + '\n'
-				output += f"The validator `...{adnlEnding} ({label})` has restarted {statusIcon}"
+				output += f"The validator `...{adnlEnding}{labelText}` has restarted {statusIcon}"
 				AddMessage(userId, output)
 		elif status is False:
 			if adnlAddr not in userAlarmList:
 				userAlarmList.append(adnlAddr)
 				output = "`[Alarm]`" + '\n'
-				output += f"The validator `...{adnlEnding} ({label})` went down {statusIcon}"
+				output += f"The validator `...{adnlEnding}{labelText}` went down {statusIcon}"
 				AddMessage(userId, output)
 		#end if
 #end define
