@@ -1,0 +1,3 @@
+[submodule "mypylib"]
+	path = mypylib
+	url = https://github.com/igroman787/mypylib
