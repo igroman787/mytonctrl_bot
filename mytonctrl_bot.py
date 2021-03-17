@@ -216,6 +216,16 @@ def GetUserAlarmList(userId):
 	return alarmList
 #end define
 
+def GetUserLabels(userId):
+	userId = str(userId)
+	userDb = GetUserDb(userId)
+	labels = userDb.get("labels")
+	if labels is None:
+		labels = dict()
+		userDb["labels"] = labels
+	return labels
+#end define
+
 def FindTextInList(inputList, text):
 	result = None
 	if text is None:
@@ -300,11 +310,12 @@ def AddCmd(update, context):
 	chatId = update.effective_chat.id
 	userId = update.effective_user.id
 	inputArgs = context.args
-	inputItem = GetItem(inputArgs)
+	inputAdnl = GetItem(inputArgs) # <adnl-addr>
+	inputLabel = GetItem(inputArgs, 1) # <label>
 
 	validatorsList = GetValidatorsList()
-	adnl = FindTextInList(validatorsList, inputItem)
-	if inputItem is None:
+	adnl = FindTextInList(validatorsList, inputAdnl)
+	if inputAdnl is None:
 		output = "error"
 	elif adnl is None:
 		output = "error2"
@@ -312,6 +323,9 @@ def AddCmd(update, context):
 		userAdnlList = GetUserAdnlList(userId)
 		userAdnlList.append(adnl)
 		output = "ok"
+		if inputLabel is not None:
+			userLabels = GetUserLabels(userId)
+			userLabels[adnl] = inputLabel
 	SendMessage(chatId, output)
 #end define
 
@@ -321,6 +335,7 @@ def DelCmd(update, context):
 	inputArgs = context.args
 	inputItem = GetItem(inputArgs)
 
+	userLabels = GetUserLabels(userId)
 	userAdnlList = GetUserAdnlList(userId)
 	adnl = FindTextInList(userAdnlList, inputItem)
 	if inputItem is None:
@@ -329,6 +344,8 @@ def DelCmd(update, context):
 		output = "error2"
 	else:
 		userAdnlList.remove(adnl)
+		if adnl in userLabels:
+			userLabels.pop(adnl)
 		output = "ok"
 	SendMessage(chatId, output)
 #end define
@@ -337,8 +354,13 @@ def ListCmd(update, context):
 	chatId = update.effective_chat.id
 	userId = update.effective_user.id
 	userAdnlList = GetUserAdnlList(userId)
-	output = json.dumps(userAdnlList, indent=2)
-	output = f"`{output}`"
+	userLabels = GetUserLabels(userId)
+	output = ""
+	for adnl in userAdnlList:
+		label = userLabels.get(adnl, "")
+		output += f"`{adnl} {label}`"
+	# output = json.dumps(userAdnlList, indent=2)
+	# output = f"`{output}`"
 	SendMessage(chatId, output)
 #end define
 
@@ -372,30 +394,36 @@ def StatusCmd(update, context):
 
 def GetMyStatus(userId):
 	'''Отобразить статусы своих валидаторов'''
+	userLabels = GetUserLabels(userId)
 	userAdnlList = GetUserAdnlList(userId)
 	result = list()
 	for adnlAddr in userAdnlList:
 		data = GetValidatorStatus(adnlAddr)
+		data["label"] = userLabels.get(adnlAddr)
 		result.append(data)
 	return result
 #end define
 
 def GetAllStatus():
 	'''Отобразить статусы всех валидаторов'''
+	userLabels = GetUserLabels(userId)
 	validatorsList = GetValidatorsList()
 	result = list()
 	for adnlAddr in validatorsList:
 		data = GetValidatorStatus(adnlAddr)
+		data["label"] = userLabels.get(adnlAddr)
 		result.append(data)
 	return result
 #end define
 
 def GetDiedStatus():
 	'''Отобразить статусы мертвых валидаторов'''
+	userLabels = GetUserLabels(userId)
 	validatorsList = GetValidatorsList()
 	result = list()
 	for adnlAddr in validatorsList:
 		data = GetValidatorStatus(adnlAddr)
+		data["label"] = userLabels.get(adnlAddr)
 		if data["status"] is False:
 			result.append(data)
 	return result
@@ -403,9 +431,11 @@ def GetDiedStatus():
 
 def GetOneStatus(inputItem):
 	'''Отобразить статус одного валидатора'''
+	userLabels = GetUserLabels(userId)
 	validatorsList = GetValidatorsList()
 	adnlAddr = FindTextInList(validatorsList, inputItem)
 	data = GetValidatorStatus(adnlAddr)
+	data["label"] = userLabels.get(adnlAddr)
 	if adnlAddr is None:
 		buff = len(inputItem)
 		if buff > 6:
@@ -436,6 +466,7 @@ def StatusList2Text(data):
 def Status2Text(item):
 	output = ""
 	# print("Status2Text.item:", json.dumps(item))
+	label = item.get("label")
 	adnlAddr = item.get("adnlAddr")
 	adnlEnding = item.get("adnlEnding")
 	isValidator = item.get("isValidator")
@@ -447,6 +478,8 @@ def Status2Text(item):
 	tps = item.get("tps")
 	outOfSync = item.get("outOfSync")
 	statusIcon = item.get("statusIcon")
+	if label:
+		output += f"Label:            {label}" + '\n'
 	output += f"ADNL:            ...{adnlEnding} `{statusIcon}`" + '\n'
 	output += f"Validator:       {isValidator}" + '\n'
 	if isValidator:
