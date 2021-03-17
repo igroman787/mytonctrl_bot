@@ -377,15 +377,15 @@ def StatusCmd(update, context):
 		output = Status2TextWithFraction(data)
 	elif inputItem == "all":
 		# Отобразить статусы всех валидаторов
-		data = GetAllStatus()
+		data = GetAllStatus(userId)
 		output = Status2TextWithFraction(data)
 	elif inputItem == "died":
 		# Отобразить статусы мертвых валидаторов
-		data = GetDiedStatus()
+		data = GetDiedStatus(userId)
 		output = Status2TextWithFraction(data)
 	else:
 		# Отобразить статус одного валидатора
-		data = GetOneStatus(inputItem)
+		data = GetOneStatus(userId, inputItem)
 		output = Status2Text(data)
 	#end if
 
@@ -404,7 +404,7 @@ def GetMyStatus(userId):
 	return result
 #end define
 
-def GetAllStatus():
+def GetAllStatus(userId):
 	'''Отобразить статусы всех валидаторов'''
 	userLabels = GetUserLabels(userId)
 	validatorsList = GetValidatorsList()
@@ -416,7 +416,7 @@ def GetAllStatus():
 	return result
 #end define
 
-def GetDiedStatus():
+def GetDiedStatus(userId):
 	'''Отобразить статусы мертвых валидаторов'''
 	userLabels = GetUserLabels(userId)
 	validatorsList = GetValidatorsList()
@@ -429,7 +429,7 @@ def GetDiedStatus():
 	return result
 #end define
 
-def GetOneStatus(inputItem):
+def GetOneStatus(userId, inputItem):
 	'''Отобразить статус одного валидатора'''
 	userLabels = GetUserLabels(userId)
 	validatorsList = GetValidatorsList()
