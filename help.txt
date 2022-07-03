@@ -1,0 +1,13 @@
+`mytonctrl_bot` - This bot allows you to monitor the state of the validator.
+To start using the bot, add the validator address to the watch list.
+Instead of the full address of the validator, you can use the last few characters.
+
+```
+/add <adnl>     - Add a validator to your the watch list.
+/del <adnl>     - Remove the validator from your the watch list.
+/list           - Show the list of validators you are subscribed to.
+/status         - Show the status of the validators you subscribe to.
+/status <adnl>  - Show validator status at its address.
+/status all     - Show status of all validators.
+/status died    - Show status of dead validators
+```

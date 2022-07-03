@@ -14,19 +14,27 @@ from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
+# TON components
+from sys import path
+path.append("/usr/src/mytonctrl/")
+from mytoncore import MyTonCore
+
 
 
 # Global vars
 local = MyPyClass(__file__)
+ton = MyTonCore()
 
 
 def Init():
 	# Load bot settings (telegramBotToken)
-	file = open("settings.json", "rt")
+	filePath = local.buffer.get("myDir") + "settings.json"
+	file = open(filePath, "rt")
 	text = file.read()
 	file.close()
 	buff = json.loads(text)
 	local.buffer["telegramBotToken"] = buff.get("telegramBotToken")
+	local.buffer["apiKey"] = buff.get("apiKey")
 
 	# Load translate table
 	# local.InitTranslator(local.buffer.get("myDir") + "translate.json")
@@ -68,19 +76,17 @@ def GetToncenterData():
 		if diffTime < 60:
 			return toncenterData
 	#end if
-
-	# Get gata
-	url = "https://toncenter.com/api/newton_test/status/debug"
-	text = TryGetUrl(url)
-	data = json.loads(text)
-	nodes = data.get("nodes_stats")
-	validators = data.get("current_validators")
+	
+	# Get nodes data
+	apiKey = local.buffer.get("apiKey")
+	telemetryUrl = f"https://validator.health.toncenter.com/getTelemetryData?timestamp_from={timestamp-100}&api_key={apiKey}"
+	telemetryText = TryGetUrl(telemetryUrl)
+	nodes = json.loads(telemetryText)
 
 	# Set buffer
 	toncenterData = dict()
 	toncenterData["timestamp"] = timestamp
 	toncenterData["nodes"] = nodes
-	toncenterData["validators"] = validators
 	local.buffer["toncenterData"] = toncenterData
 	return toncenterData
 #end define
@@ -92,7 +98,7 @@ def GetValidatorStatus(adnlAddr):
 
 	# get data
 	toncenterData = GetToncenterData()
-	validators = toncenterData.get("validators")
+	validators = ton.GetValidatorsList()
 	nodes = toncenterData.get("nodes")
 
 	# Get validator info
@@ -105,25 +111,26 @@ def GetValidatorStatus(adnlAddr):
 			data["adnlEnding"] = adnlAddr[58:65]
 			data["pubkey"] = item.get("pubkey")
 			data["weight"] = item.get("weight")
-			data["mr"] = item.get("mr")
-			data["wr"] = item.get("wr")
 			data["efficiency"] = item.get("efficiency")
-		#end for
+	#end for
 
 	# Get node info
-	buff = nodes.get(adnlAddr)
-	if buff is not None:
-		data["isSendTelemetry"] = True
-		data["cpuLoad"] = buff.get("cpuLoad")
-		data["netLoad"] = buff.get("netLoad")
-		data["tps"] = buff.get("tps")
-		buffStatus = buff.get("validatorStatus")
-		if buffStatus:
-			data["isWorking"] = buffStatus.get("isWorking")
-			data["unixtime"] = buffStatus.get("unixtime")
-			data["masterchainblocktime"] = buffStatus.get("masterchainblocktime")
-			data["outOfSync"] = buffStatus.get("outOfSync")
-	#end if
+	for item in nodes:
+		itemAdnlAddr = item.get("adnl_address")
+		buff = item.get("data")
+		if adnlAddr == itemAdnlAddr:
+			data["isSendTelemetry"] = True
+			data["cpuLoad"] = buff.get("cpuLoad")
+			data["netLoad"] = buff.get("netLoad")
+			data["tps"] = buff.get("tps")
+			buffStatus = buff.get("validatorStatus")
+			if buffStatus:
+				data["isWorking"] = buffStatus.get("isWorking")
+				data["unixtime"] = buffStatus.get("unixtime")
+				data["masterchainblocktime"] = buffStatus.get("masterchainblocktime")
+				data["outOfSync"] = buffStatus.get("outOfSync")
+			#end if
+	#end for
 
 	# Set status
 	isWorking = data.get("isWorking")
@@ -164,7 +171,9 @@ def GetValidatorStatus(adnlAddr):
 #end define
 
 def SendMessage(chatId, output):
-	# print("SendMessage.output:", json.dumps(output))
+	# print(f"SendMessage chatId: {chatId}, output: {output}")
+	if len(output) == 0:
+		output = "Empty"
 	if type(output) == str:
 		SendMessageWork(chatId, output)
 	elif type(output) == list:
@@ -251,7 +260,7 @@ def FindTextInList(inputList, text):
 def GetValidatorsList():
 	result = list()
 	toncenterData = GetToncenterData()
-	validators = toncenterData.get("validators")
+	validators = ton.GetValidatorsList()
 	for item in validators:
 		adnlAddr = item.get("adnlAddr")
 		if adnlAddr:
@@ -269,23 +278,21 @@ def InitBot():
 	# Create handlers
 	echoHandler = MessageHandler(Filters.text & (~Filters.command), EchoCmd)
 	startHandler = CommandHandler("start", StartCmd)
+	helpHandler = CommandHandler("help", HelpCmd)
 	statusHandler = CommandHandler("status", StatusCmd)
-	stHandler = CommandHandler("st", StatusCmd)
 	addHandler = CommandHandler("add", AddCmd)
 	delHandler = CommandHandler("del", DelCmd)
 	listHandler = CommandHandler("list", ListCmd)
-	lsHandler = CommandHandler("ls", ListCmd)
 	unknownHandler = MessageHandler(Filters.command, UnknownCmd)
 
 	# Add handlers
 	dispatcher.add_handler(echoHandler)
 	dispatcher.add_handler(startHandler)
+	dispatcher.add_handler(helpHandler)
 	dispatcher.add_handler(statusHandler)
-	dispatcher.add_handler(stHandler)
 	dispatcher.add_handler(addHandler)
 	dispatcher.add_handler(delHandler)
 	dispatcher.add_handler(listHandler)
-	dispatcher.add_handler(lsHandler)
 	dispatcher.add_handler(unknownHandler)
 
 	return updater
@@ -295,22 +302,29 @@ def EchoCmd(update, context):
 	#input = update.message.text
 	#input = context.args
 	chatId = update.effective_chat.id
-	output = "Хм..."
 	output = "Hm..."
 	SendMessage(chatId, output)
 #end define
 
 def UnknownCmd(update, context):
 	chatId = update.effective_chat.id
-	output = "Извините, я не понял эту команду."
 	output = "Sorry, I didn't understand that command."
 	SendMessage(chatId, output)
 #end define
 
 def StartCmd(update, context):
 	chatId = update.effective_chat.id
-	output = "Данный бот позволяет следить за состоянием валидатора."
-	output = "This bot allows you to monitor the state of the validator."
+	output = "This bot allows you to monitor the state of the validator." + '\n'
+	output += "For more information use command /help"
+	SendMessage(chatId, output)
+#end define
+
+def HelpCmd(update, context):
+	chatId = update.effective_chat.id
+	filePath = local.buffer.get("myDir") + "help.txt"
+	file = open(filePath, 'rt')
+	output = file.read()
+	file.close()
 	SendMessage(chatId, output)
 #end define
 
@@ -324,13 +338,13 @@ def AddCmd(update, context):
 	validatorsList = GetValidatorsList()
 	adnl = FindTextInList(validatorsList, inputAdnl)
 	if inputAdnl is None:
-		output = "error"
+		output = "ADNL not set"
 	elif adnl is None:
-		output = "error2"
+		output = "ADNL not found"
 	else:
 		userAdnlList = GetUserAdnlList(userId)
 		userAdnlList.append(adnl)
-		output = "ok"
+		output = "ok, adnl: " + adnl
 		if inputLabel is not None:
 			userLabels = GetUserLabels(userId)
 			userLabels[adnl] = inputLabel
