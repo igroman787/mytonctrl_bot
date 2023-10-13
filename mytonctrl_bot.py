@@ -54,9 +54,10 @@ def TryGetUrl(url):
 		try:
 			data = GetUrl(url)
 			return data
-		except Exception as err:
+		except Exception as ex:
+			err = ex
 			time.sleep(1)
-	raise Exception("TryGetUrl error: {err}")
+	raise Exception(f"TryGetUrl error: {err}")
 #end define
 
 def GetUrl(url):
@@ -79,7 +80,7 @@ def GetToncenterData():
 	
 	# Get nodes data
 	apiKey = local.buffer.get("apiKey")
-	telemetryUrl = f"https://validator.health.toncenter.com/getTelemetryData?timestamp_from={timestamp-100}&api_key={apiKey}"
+	telemetryUrl = f"https://telemetry.toncenter.com/getTelemetryData?timestamp_from={timestamp-100}&api_key={apiKey}"
 	telemetryText = TryGetUrl(telemetryUrl)
 	nodes = json.loads(telemetryText)
 
