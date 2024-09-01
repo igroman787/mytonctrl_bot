@@ -5,121 +5,98 @@ import time
 import json
 import threading
 import urllib.request
-from mypylib.mypylib import *
+from mypylib.mypylib import MyPyClass, Dict, get_timestamp
 
 # Telegram components
-#pip3 install python-telegram-bot
+#pip3 install python-telegram-bot==13.7
 from telegram import Bot, ParseMode
 from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
-# TON components
-from sys import path
-path.append("/usr/src/mytonctrl/")
-from mytoncore import MyTonCore
-
+from utils import (
+	get_config,
+	get_dict_from,
+	find_text_in_list,
+	get_item_from_list
+)
+from user import User, get_users
+from user_warnings.complaints_warning import ComplaintsWarning
+from toncenter import Toncenter
 
 
 # Global vars
 local = MyPyClass(__file__)
-ton = MyTonCore()
+toncenter = Toncenter(local)
 
 
-def Init():
-	# Load bot settings (telegramBotToken)
-	filePath = local.buffer.get("myDir") + "settings.json"
-	file = open(filePath, "rt")
-	text = file.read()
-	file.close()
-	buff = json.loads(text)
-	local.buffer["telegramBotToken"] = buff.get("telegramBotToken")
-	local.buffer["apiKey"] = buff.get("apiKey")
+def init():
+	init_warnings()
+	init_buffer()
 
 	# Load translate table
 	# local.InitTranslator(local.buffer.get("myDir") + "translate.json")
 
 	# Set local config
-	local.db["config"]["isLocaldbSaving"] = True
-	local.db["config"]["logLevel"] = "debug"
-	local.Run()
+	local.db.config.isLocaldbSaving = True
+	local.db.config.logLevel = "debug"
+	local.run()
 
 	# Start threads
-	local.StartCycle(MessageSender, sec=3)
-	local.StartCycle(ScanValidators, sec=60)
+
+	local.start_cycle(message_sender, sec=1)
+	#local.start_cycle(scan_validators, sec=60)
+	local.start_cycle(scan_warnings, sec=60)
 #end define
 
-def TryGetUrl(url):
-	for i in range(3):
-		try:
-			data = GetUrl(url)
-			return data
-		except Exception as ex:
-			err = ex
-			time.sleep(1)
-	raise Exception(f"TryGetUrl error: {err}")
+def init_warnings():
+	complaints_warning = ComplaintsWarning(local, toncenter)
+	local.buffer.possible_warnings = [complaints_warning]
+	local.buffer.possible_warnings_list = list()
+	for item in local.buffer.possible_warnings:
+		local.buffer.possible_warnings_list.append(type(item).__name__)
+	local.buffer.possible_warnings_text = ", ".join(local.buffer.possible_warnings_list)
 #end define
 
-def GetUrl(url):
-	req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-	web = urllib.request.urlopen(req)
-	data = web.read()
-	text = data.decode()
-	return text
+def init_buffer():
+	config_path = local.buffer.my_dir + "settings.json"
+	data = get_config(config_path)
+	local.buffer.telegram_bot_token = data.telegram_bot_token
+	local.buffer.api_key = data.api_key
 #end define
 
-def GetToncenterData():
-	# Get buffer
-	timestamp = GetTimestamp()
-	toncenterData = local.buffer.get("toncenterData")
-	if toncenterData:
-		diffTime = timestamp - toncenterData.get("timestamp")
-		if diffTime < 60:
-			return toncenterData
-	#end if
-	
-	# Get nodes data
-	apiKey = local.buffer.get("apiKey")
-	telemetryUrl = f"https://telemetry.toncenter.com/getTelemetryData?timestamp_from={timestamp-100}&api_key={apiKey}"
-	telemetryText = TryGetUrl(telemetryUrl)
-	nodes = json.loads(telemetryText)
-
-	# Set buffer
-	toncenterData = dict()
-	toncenterData["timestamp"] = timestamp
-	toncenterData["nodes"] = nodes
-	local.buffer["toncenterData"] = toncenterData
-	return toncenterData
+def message_sender():
+	users = get_users(local)
+	for user in users:
+		user.send_messages(send_message)
 #end define
 
-def GetValidatorStatus(adnlAddr):
+def get_validator_status(adnl_addr):
 	data = dict()
 	data["isValidator"] = False
 	data["isSendTelemetry"] = False
 
 	# get data
-	toncenterData = GetToncenterData()
-	validators = ton.GetValidatorsList()
-	nodes = toncenterData.get("nodes")
+	nodes = toncenter.get_telemetry()
+	validators = toncenter.get_validators()
 
 	# Get validator info
-	for item in validators:
-		itemAdnlAddr = item.get("adnlAddr")
-		if adnlAddr == itemAdnlAddr:
-			# print("GetValidatorStatus.item:", json.dumps(item))
+	for validator in validators:
+		itemAdnlAddr = validator.get("adnl_addr")
+		if adnl_addr == itemAdnlAddr:
+			# print("get_validator_status.validator:", json.dumps(validator))
 			data["isValidator"] = True
-			data["adnlAddr"] = adnlAddr
-			data["adnlEnding"] = adnlAddr[58:65]
-			data["pubkey"] = item.get("pubkey")
-			data["weight"] = item.get("weight")
-			data["efficiency"] = item.get("efficiency")
+			data["adnl_addr"] = adnl_addr
+			data["adnl_ending"] = adnl_addr[58:65]
+			data["pubkey"] = validator.get("pubkey")
+			data["weight"] = validator.get("weight")
 	#end for
 
 	# Get node info
 	for item in nodes:
 		itemAdnlAddr = item.get("adnl_address")
 		buff = item.get("data")
-		if adnlAddr == itemAdnlAddr:
+		if adnl_addr == itemAdnlAddr:
 			data["isSendTelemetry"] = True
 			data["cpuLoad"] = buff.get("cpuLoad")
 			data["netLoad"] = buff.get("netLoad")
@@ -136,22 +113,13 @@ def GetValidatorStatus(adnlAddr):
 	# Set status
 	isWorking = data.get("isWorking")
 	outOfSync = data.get("outOfSync")
-	efficiency = data.get("efficiency")
 	isValidator = data.get("isValidator")
-	# Если у нас нету данных по эффективности, или нода не валидатор
-	if efficiency is None or isValidator is False:
-		status = None
+
+	status = None
 	# Если нода отправляет телеметрию
-	elif outOfSync is not None:
+	if outOfSync is not None:
 		# Если рассинхронизация > 300, или эффективность < 10, или нода не работает
-		if outOfSync > 300 or efficiency < 10 or isWorking is False:
-			status = False
-		else:
-			status = True
-	# Если нода не отправляет телеметрию
-	elif outOfSync is None:
-		# Если эффективность < 10
-		if efficiency < 10:
+		if outOfSync > 300 or isWorking is False:
 			status = False
 		else:
 			status = True
@@ -159,311 +127,263 @@ def GetValidatorStatus(adnlAddr):
 
 	# Set status icon
 	if status is True:
-		statusIcon = "✅"
+		status_icon = "✅"
 	elif status is False:
-		statusIcon = "❌"
+		status_icon = "❌"
 	else:
-		statusIcon = ""
-	data["statusIcon"] = statusIcon
+		status_icon = ""
+	data["status_icon"] = status_icon
 	data["status"] = status
-	#end if
 
 	return data
 #end define
 
-def SendMessage(chatId, output):
-	# print(f"SendMessage chatId: {chatId}, output: {output}")
-	if len(output) == 0:
-		output = "Empty"
-	if type(output) == str:
-		SendMessageWork(chatId, output)
-	elif type(output) == list:
-		for item in output:
-			SendMessageWork(chatId, item)
+def send_message(user, text, markdown=True):
+	# print(f"send_message user: {user.id}, text: {text}")
+	if len(text) == 0:
+		text = "No result"
+	if type(text) == str:
+		send_message_work(user, text, markdown)
+	elif type(text) == list:
+		for item in text:
+			send_message_work(user, item, markdown)
 #end define
 
-def SendMessageWork(chatId, output):
-	# print("SendMessageWork.output:", json.dumps(output))
-	# context.bot.sendMessage(chat_id=chatId, text=output, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True, disable_notification=True)
-	local.buffer["updater"].bot.sendMessage(chat_id=chatId, text=output, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True, disable_notification=True)
+def send_message_work(user, text, markdown=True):
+	# print("send_message_work.text:", json.dumps(text))
+	# context.bot.sendMessage(user.id=user.id, text=text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True, disable_notification=True)
+	parse_mode = None
+	if markdown == True:
+		parse_mode = ParseMode.MARKDOWN
+	local.buffer.updater.bot.sendMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_web_page_preview=True, disable_notification=True)
 #end define
 
-def GetItem(inputArgs, index=0):
-	try:
-		inputItem = inputArgs[index]
-	except:
-		inputItem = None
-	return inputItem
-#end define
-
-def GetUsers():
-	users = local.db.get("users")
-	if users is None:
-		users = dict()
-		local.db["users"] = users
-	return users
-#end define
-
-def GetUserDb(userId):
-	userId = str(userId)
-	users = GetUsers()
-	userDb = users.get(userId)
-	if userDb is None:
-		userDb = dict()
-		users[userId] = userDb
-	return userDb
-#end define
-
-def GetUserAdnlList(userId):
-	userId = str(userId)
-	userDb = GetUserDb(userId)
-	adnlList = userDb.get("adnlList")
-	if adnlList is None:
-		adnlList = list()
-		userDb["adnlList"] = adnlList
-	return adnlList
-#end define
-
-def GetUserAlarmList(userId):
-	userId = str(userId)
-	userDb = GetUserDb(userId)
-	alarmList = userDb.get("alarmList")
-	if alarmList is None:
-		alarmList = list()
-		userDb["alarmList"] = alarmList
-	return alarmList
-#end define
-
-def GetUserLabels(userId):
-	userId = str(userId)
-	userDb = GetUserDb(userId)
-	labels = userDb.get("labels")
-	if labels is None:
-		labels = dict()
-		userDb["labels"] = labels
-	return labels
-#end define
-
-def FindTextInList(inputList, text):
-	result = None
-	if text is None:
-		return result
-	textLen = len(text)
-	for item in inputList:
-		itemLen = len(item)
-		start = itemLen-textLen
-		buff = item[start:itemLen]
-		if text == buff:
-			result = item
-	return result
-#end define
-
-def GetValidatorsList():
-	result = list()
-	toncenterData = GetToncenterData()
-	validators = ton.GetValidatorsList()
-	for item in validators:
-		adnlAddr = item.get("adnlAddr")
-		if adnlAddr:
-			result.append(adnlAddr)
-	return result
-#end define
-
-def InitBot():
-	# bot = Bot(token=telegramBotToken)
-	telegramBotToken = local.buffer.get("telegramBotToken")
-	updater = Updater(token=telegramBotToken, use_context=True)
+def init_bot():
+	# bot = Bot(token=telegram_bot_token)
+	# print(f"local.buffer: {local.buffer}")
+	telegram_bot_token = local.buffer.telegram_bot_token
+	updater = Updater(token=telegram_bot_token, use_context=True)
 	dispatcher = updater.dispatcher
 	local.buffer["updater"] = updater
 
 	# Create handlers
-	echoHandler = MessageHandler(Filters.text & (~Filters.command), EchoCmd)
-	startHandler = CommandHandler("start", StartCmd)
-	helpHandler = CommandHandler("help", HelpCmd)
-	statusHandler = CommandHandler("status", StatusCmd)
-	addHandler = CommandHandler("add", AddCmd)
-	delHandler = CommandHandler("del", DelCmd)
-	listHandler = CommandHandler("list", ListCmd)
-	unknownHandler = MessageHandler(Filters.command, UnknownCmd)
+	echo_handler = MessageHandler(Filters.text & (~Filters.command), echo_cmd)
+	start_handler = CommandHandler("start", start_cmd)
+	help_handler = CommandHandler("help", help_cmd)
+	status_handler = CommandHandler("status", status_cmd)
+	add_adnl_handler = CommandHandler("add_adnl", add_adnl_cmd)
+	add_warning_handler = CommandHandler("add_warning", add_warning_cmd)
+	del_handler = CommandHandler("del", del_cmd)
+	list_handler = CommandHandler("list", list_cmd)
+	unknown_handler = MessageHandler(Filters.command, unknown_cmd)
 
 	# Add handlers
-	dispatcher.add_handler(echoHandler)
-	dispatcher.add_handler(startHandler)
-	dispatcher.add_handler(helpHandler)
-	dispatcher.add_handler(statusHandler)
-	dispatcher.add_handler(addHandler)
-	dispatcher.add_handler(delHandler)
-	dispatcher.add_handler(listHandler)
-	dispatcher.add_handler(unknownHandler)
+	dispatcher.add_handler(echo_handler)
+	dispatcher.add_handler(start_handler)
+	dispatcher.add_handler(help_handler)
+	dispatcher.add_handler(status_handler)
+	dispatcher.add_handler(add_adnl_handler)
+	dispatcher.add_handler(add_warning_handler)
+	dispatcher.add_handler(del_handler)
+	dispatcher.add_handler(list_handler)
+	dispatcher.add_handler(unknown_handler)
 
 	return updater
 #end define
 
-def EchoCmd(update, context):
+def echo_cmd(update, context):
 	#input = update.message.text
 	#input = context.args
-	chatId = update.effective_chat.id
-	output = "Hm..."
-	SendMessage(chatId, output)
+	user = User(local, update.effective_user.id)
+	output = "Technical support for validators: @mytonctrl_help_bot"
+	send_message(user, output)
 #end define
 
-def UnknownCmd(update, context):
-	chatId = update.effective_chat.id
+def unknown_cmd(update, context):
+	user = User(local, update.effective_user.id)
 	output = "Sorry, I didn't understand that command."
-	SendMessage(chatId, output)
+	send_message(user, output)
 #end define
 
-def StartCmd(update, context):
-	chatId = update.effective_chat.id
+def start_cmd(update, context):
+	user = User(local, update.effective_user.id)
 	output = "This bot allows you to monitor the state of the validator." + '\n'
 	output += "For more information use command /help"
-	SendMessage(chatId, output)
+	send_message(user, output)
 #end define
 
-def HelpCmd(update, context):
-	chatId = update.effective_chat.id
-	filePath = local.buffer.get("myDir") + "help.txt"
-	file = open(filePath, 'rt')
-	output = file.read()
-	file.close()
-	SendMessage(chatId, output)
+def help_cmd(update, context):
+	user = User(local, update.effective_user.id)
+	file_path = local.buffer.my_dir + "help.txt"
+	output = read_file(file_path)
+	send_message(user, output)
 #end define
 
-def AddCmd(update, context):
-	chatId = update.effective_chat.id
-	userId = update.effective_user.id
-	inputArgs = context.args
-	inputAdnl = GetItem(inputArgs) # <adnl-addr>
-	inputLabel = GetItem(inputArgs, 1) # <label>
+def add_adnl_cmd(update, context):
+	user = User(local, update.effective_user.id)
 
-	validatorsList = GetValidatorsList()
-	adnl = FindTextInList(validatorsList, inputAdnl)
-	if inputAdnl is None:
-		output = "ADNL not set"
-	elif adnl is None:
-		output = "ADNL not found"
+	try:
+		adnl = context.args[0]
+		label = get_item_from_list(context.args, 1)
+	except:
+		error = "Bad args. Usage: `add_adnl <adnl> [<label>]`"
+		send_message(user, error)
+		return
+	do_add_adnl_cmd(user, adnl, label)
+#end define
+
+def do_add_adnl_cmd(user, input_adnl, input_label):
+	validators_list = toncenter.get_validators_list()
+	adnl = find_text_in_list(validators_list, input_adnl)
+	if adnl is None:
+		output = f"ADNL not found: _{input_adnl}_"
 	else:
-		userAdnlList = GetUserAdnlList(userId)
-		userAdnlList.append(adnl)
-		output = "ok, adnl: " + adnl
-		if inputLabel is not None:
-			userLabels = GetUserLabels(userId)
-			userLabels[adnl] = inputLabel
-	SendMessage(chatId, output)
+		user_adnl_list = user.get_adnl_list()
+		user_adnl_list.append(adnl)
+		output = f"Ok, ADNL added: _{adnl}_"
+		if input_label is not None:
+			user_labels = user.get_labels()
+			user_labels[adnl] = input_label
+	send_message(user, output)
 #end define
 
-def DelCmd(update, context):
-	chatId = update.effective_chat.id
-	userId = update.effective_user.id
-	inputArgs = context.args
-	inputItem = GetItem(inputArgs)
+def add_warning_cmd(update, context):
+	user = User(local, update.effective_user.id)
 
-	userLabels = GetUserLabels(userId)
-	userAdnlList = GetUserAdnlList(userId)
-	adnl = FindTextInList(userAdnlList, inputItem)
-	if inputItem is None:
+	try:
+		warning_type = context.args[0]
+	except:
+		error = "Bad args. Usage: `add_warning <warning_type>`" + '\n'
+		error += f"Possible warnings: _{local.buffer.possible_warnings_text}_"
+		send_message(user, error)
+		return
+	do_add_warning_cmd(user, warning_type)
+#end define
+
+def do_add_warning_cmd(user, warning_type):
+	if warning_type not in local.buffer.possible_warnings_list:
+		output = f"Warning not found. Possible warnings: _{local.buffer.possible_warnings_text}_"
+	else:
+		user_warnings_list = user.get_warnings_list()
+		user_warnings_list.append(warning_type)
+		output = f"Ok, warning added: _{warning_type}_"
+	send_message(user, output)
+#end define
+
+def del_cmd(update, context):
+	user = User(local, update.effective_user.id)
+
+	input_args = context.args
+	input_item = get_item_from_list(input_args)
+
+	user_adnl_list = user.get_adnl_list()
+	user_labels = user.get_labels()
+	adnl = find_text_in_list(user_adnl_list, input_item)
+	if input_item is None:
 		output = "error"
 	elif adnl is None:
 		output = "error2"
 	else:
-		userAdnlList.remove(adnl)
-		if adnl in userLabels:
-			userLabels.pop(adnl)
+		user_adnl_list.remove(adnl)
+		if adnl in user_labels:
+			user_labels.pop(adnl)
 		output = "ok"
-	SendMessage(chatId, output)
+	send_message(user, output)
 #end define
 
-def ListCmd(update, context):
-	chatId = update.effective_chat.id
-	userId = update.effective_user.id
-	userAdnlList = GetUserAdnlList(userId)
-	userLabels = GetUserLabels(userId)
+def list_cmd(update, context):
+	user = User(local, update.effective_user.id)
+
+	user_adnl_list = user.get_adnl_list()
+	user_labels = user.get_labels()
 	output = ""
-	for adnl in userAdnlList:
-		label = userLabels.get(adnl, "")
+	for adnl in user_adnl_list:
+		label = user_labels.get(adnl, "")
 		output += f"`{adnl} {label}`"
-	# output = json.dumps(userAdnlList, indent=2)
+	# output = json.dumps(user_adnl_list, indent=2)
 	# output = f"`{output}`"
-	SendMessage(chatId, output)
+	send_message(user, output)
 #end define
 
 
-def StatusCmd(update, context):
-	chatId = update.effective_chat.id
-	userId = update.effective_user.id
-	inputArgs = context.args
-	inputItem = GetItem(inputArgs)
+def status_cmd(update, context):
+	user = User(local, update.effective_user.id)
 
-	if inputItem is None:
+	input_args = context.args
+	input_item = get_item_from_list(input_args)
+
+	if input_item is None:
 		# Отобразить статусы своих валидаторов
-		data = GetMyStatus(userId)
+		data = get_my_status(user)
 		output = Status2TextWithFraction(data)
-	elif inputItem == "all":
+	elif input_item == "all":
 		# Отобразить статусы всех валидаторов
-		data = GetAllStatus(userId)
+		data = GetAllStatus(user)
 		output = Status2TextWithFraction(data)
-	elif inputItem == "died":
+	elif input_item == "died":
 		# Отобразить статусы мертвых валидаторов
-		data = GetDiedStatus(userId)
+		data = GetDiedStatus(user)
 		output = Status2TextWithFraction(data)
 	else:
 		# Отобразить статус одного валидатора
-		data = GetOneStatus(userId, inputItem)
+		data = GetOneStatus(user, input_item)
 		output = Status2Text(data)
 	#end if
 
-	SendMessage(chatId, output)
+	send_message(user, output)
 #end define
 
-def GetMyStatus(userId):
+def get_my_status(user):
 	'''Отобразить статусы своих валидаторов'''
-	userLabels = GetUserLabels(userId)
-	userAdnlList = GetUserAdnlList(userId)
+	user_labels = user.get_labels()
+	user_adnl_list = user.get_adnl_list()
 	result = list()
-	for adnlAddr in userAdnlList:
-		data = GetValidatorStatus(adnlAddr)
-		data["label"] = userLabels.get(adnlAddr)
+	for adnl_addr in user_adnl_list:
+		data = get_validator_status(adnl_addr)
+		data["label"] = user_labels.get(adnl_addr)
 		result.append(data)
 	return result
 #end define
 
-def GetAllStatus(userId):
+
+def GetAllStatus(user):
 	'''Отобразить статусы всех валидаторов'''
-	userLabels = GetUserLabels(userId)
-	validatorsList = GetValidatorsList()
+	user_labels = user.get_labels()
+	validators_list = toncenter.get_validators_list()
 	result = list()
-	for adnlAddr in validatorsList:
-		data = GetValidatorStatus(adnlAddr)
-		data["label"] = userLabels.get(adnlAddr)
+	for adnl_addr in validators_list:
+		data = get_validator_status(adnl_addr)
+		data["label"] = user_labels.get(adnl_addr)
 		result.append(data)
 	return result
 #end define
 
-def GetDiedStatus(userId):
+
+def GetDiedStatus(user):
 	'''Отобразить статусы мертвых валидаторов'''
-	userLabels = GetUserLabels(userId)
-	validatorsList = GetValidatorsList()
+	user_labels = user.get_labels()
+	validators_list = toncenter.get_validators_list()
 	result = list()
-	for adnlAddr in validatorsList:
-		data = GetValidatorStatus(adnlAddr)
-		data["label"] = userLabels.get(adnlAddr)
+	for adnl_addr in validators_list:
+		data = get_validator_status(adnl_addr)
+		data["label"] = user_labels.get(adnl_addr)
 		if data["status"] is False:
 			result.append(data)
 	return result
 #end define
 
-def GetOneStatus(userId, inputItem):
+def GetOneStatus(user, input_item):
 	'''Отобразить статус одного валидатора'''
-	userLabels = GetUserLabels(userId)
-	validatorsList = GetValidatorsList()
-	adnlAddr = FindTextInList(validatorsList, inputItem)
-	data = GetValidatorStatus(adnlAddr)
-	data["label"] = userLabels.get(adnlAddr)
-	if adnlAddr is None:
-		buff = len(inputItem)
+	user_labels = user.get_labels()
+	validators_list = toncenter.get_validators_list()
+	adnl_addr = find_text_in_list(validators_list, input_item)
+	data = get_validator_status(adnl_addr)
+	data["label"] = user_labels.get(adnl_addr)
+	if adnl_addr is None:
+		buff = len(input_item)
 		if buff > 6:
-			inputItem = inputItem[buff-6:]
-		data["adnlEnding"] = inputItem
+			input_item = input_item[buff-6:]
+		data["adnl_ending"] = input_item
 	return data
 #end define
 
@@ -490,25 +410,23 @@ def Status2Text(item):
 	output = ""
 	# print("Status2Text.item:", json.dumps(item))
 	label = item.get("label")
-	adnlAddr = item.get("adnlAddr")
-	adnlEnding = item.get("adnlEnding")
+	adnl_addr = item.get("adnl_addr")
+	adnl_ending = item.get("adnl_ending")
 	isValidator = item.get("isValidator")
 	isSendTelemetry = item.get("isSendTelemetry")
 	isWorking = item.get("isWorking", "unknown")
-	efficiency = item.get("efficiency")
 	cpuLoad = item.get("cpuLoad")
 	netLoad = item.get("netLoad")
 	tps = item.get("tps")
 	outOfSync = item.get("outOfSync")
-	statusIcon = item.get("statusIcon")
+	status_icon = item.get("status_icon")
 	if label:
 		output += f"Label:            {label}" + '\n'
-	output += f"ADNL:            ...{adnlEnding} `{statusIcon}`" + '\n'
+	output += f"ADNL:            ...{adnl_ending} `{status_icon}`" + '\n'
 	output += f"Validator:       {isValidator}" + '\n'
 	if isValidator:
 		output += f"Send telemetry:  {isSendTelemetry}" + '\n'
 		output += f"Working:         {isWorking}" + '\n'
-		output += f"Efficiency:      {efficiency}" + '\n'
 	if isSendTelemetry:
 		output += f"Out of sync:     {outOfSync}" + '\n'
 		output += f"Cpu load:        {cpuLoad}" + '\n'
@@ -531,69 +449,54 @@ def ListFraction(inputList, maxLen):
 	return result
 #end define
 
-def MessageSender():
-	messageSenderList = GetMessageSenderList()
-	while len(messageSenderList) > 0:
-		item = messageSenderList.pop(0)
-		chatId = item.get("chatId")
-		text = item.get("text")
-		SendMessage(chatId, text)
+def scan_validators():
+	users = get_users(local)
+	print("scan_validators.users:", json.dumps(users))
+	for user in users:
+		ScanUserValidators(user)
 #end define
 
-def AddMessage(chatId, text):
-	if chatId is None:
-		return
-	messageSenderList = GetMessageSenderList()
-	item = dict()
-	item["chatId"] = chatId
-	item["text"] = text
-	messageSenderList.append(item)
-#end define
-
-def GetMessageSenderList():
-	messageSenderList = local.buffer.get("messageSenderList")
-	if messageSenderList is None:
-		messageSenderList = list()
-		local.buffer["messageSenderList"] = messageSenderList
-	return messageSenderList
-#end define
-
-def ScanValidators():
-	users = GetUsers()
-	# print("ScanValidators.users:", json.dumps(users))
-	for userId in users:
-		ScanUserValidators(userId)
-#end define
-
-def ScanUserValidators(userId):
-	data = GetMyStatus(userId)
-	userAlarmList = GetUserAlarmList(userId)
+def ScanUserValidators(user):
+	data = get_my_status(user)
+	userAlarmList = user.get_alarm_list()
 	# print("ScanUserValidators.data:", json.dumps(data))
 	for item in data:
 		label = item.get("label")
 		status = item.get("status")
-		adnlAddr = item.get("adnlAddr")
-		adnlEnding = item.get("adnlEnding")
-		statusIcon = item.get("statusIcon")
+		adnl_addr = item.get("adnl_addr")
+		adnl_ending = item.get("adnl_ending")
+		status_icon = item.get("status_icon")
 		if label:
 			labelText = f" ({label})"
 		else:
 			labelText = ""
 		if status is True:
-			if adnlAddr in userAlarmList:
-				userAlarmList.remove(adnlAddr)
+			if adnl_addr in userAlarmList:
+				userAlarmList.remove(adnl_addr)
 				output = "`[Info]`" + '\n'
-				output += f"The validator `...{adnlEnding}{labelText}` has restarted {statusIcon}"
-				AddMessage(userId, output)
+				output += f"The validator `...{adnl_ending}{labelText}` has restarted {status_icon}"
+				user.add_message(output)
 		elif status is False:
-			if adnlAddr not in userAlarmList:
-				userAlarmList.append(adnlAddr)
+			if adnl_addr not in userAlarmList:
+				userAlarmList.append(adnl_addr)
 				output = "`[Alarm]`" + '\n'
-				output += f"The validator `...{adnlEnding}{labelText}` went down {statusIcon}"
-				AddMessage(userId, output)
+				output += f"The validator `...{adnl_ending}{labelText}` went down {status_icon}"
+				user.add_message(output)
 		#end if
 #end define
 
+def scan_warnings():
+	users = get_users(local)
+	for user in users:
+		scan_user_warnings(user)
+#end define
+
+def scan_user_warnings(user):
+	user_warnings_list = user.get_warnings_list()
+	for warning in local.buffer.possible_warnings:
+		if type(warning).__name__ in user_warnings_list:
+			warning.check(user)
+#end define
 
 
 
@@ -603,8 +506,8 @@ def ScanUserValidators(userId):
 ###
 
 if __name__ == "__main__":
-	Init()
-	updater = InitBot()
+	init()
+	updater = init_bot()
 	updater.start_polling()
 #end if
 
