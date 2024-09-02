@@ -11,6 +11,7 @@ class User:
 		self.id = str(user_id)
 		self.db = self.get_db()
 		self.buffer = self.get_buffer()
+		self.max_adnl_len = 20
 	#end define
 
 	def get_db(self):
@@ -53,6 +54,10 @@ class User:
 		return self.get_data("adnl_list", list)
 	#end define
 
+	def get_fullnode_adnl_list(self):
+		return self.get_data("fullnode_adnl_list", list)
+	#end define
+
 	def get_alarm_list(self):
 		return self.get_data("alarm_list", list)
 	#end define
@@ -83,6 +88,39 @@ class User:
 		for i in range(len(messages_list)):
 			text = messages_list.pop(0)
 			send_message_func(self, text)
+	#end define
+
+	def add_adnl(self, adnl):
+		user_adnl_list = self.get_adnl_list()
+		if adnl in user_adnl_list:
+			text = "Element is already on the list."
+			return text
+		if len(user_adnl_list) > self.max_adnl_len:
+			text = "The maximum number of elements has been reached."
+			return text
+		user_adnl_list.append(adnl)
+		text = f"Ok, ADNL added: _{adnl}_"
+		return text
+	#end define
+
+	def add_fullnode_adnl(self, fullnode_adnl):
+		user_fullnode_adnl_list = self.get_fullnode_adnl_list()
+		if fullnode_adnl in user_fullnode_adnl_list:
+			text = "Element is already on the list."
+			return text
+		if len(user_fullnode_adnl_list) > self.max_adnl_len:
+			text = "The maximum number of elements has been reached."
+			return text
+		else:
+			user_fullnode_adnl_list.append(fullnode_adnl)
+			text = f"Ok, fullnode ADNL added: _{fullnode_adnl}_"
+			return text
+	#end define
+
+	def add_label(self, label):
+		if label is not None:
+			user_labels = self.get_labels()
+			user_labels[adnl] = label
 	#end define
 #end class
 

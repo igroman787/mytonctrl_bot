@@ -2,6 +2,7 @@
 # -*- coding: utf_8 -*-
 
 import json
+import base64
 from utils import try_get_url, with_buffer
 from mypylib.mypylib import Dict, get_timestamp
 
@@ -21,13 +22,28 @@ class Toncenter:
 		return result
 	#end define
 
-	def get_telemetry(self, adnl):
+	def get_telemetry(self, user, adnl):
+		node = self.do_get_telemetry(adnl)
+		if node is None:
+			return
+		fullnode_adnl = base64.b64decode(node.data.fullnode_adnl).hex().upper()
+		if fullnode_adnl in user.get_fullnode_adnl_list():
+			return node
+	#end define
+
+	def do_get_telemetry(self, adnl):
 		telemetry_list = self.get_telemetry_list()
 		for node in telemetry_list:
-			#print(f"get_telemetry: {node.adnl_addr}")
 			if node.adnl_address != adnl:
 				continue
 			return node
+	#end define
+
+	def is_send_telemetry(self, adnl):
+		node = self.do_get_telemetry(adnl)
+		if node:
+			return True
+		return False
 	#end define
 
 	def get_telemetry_list(self):
@@ -48,6 +64,10 @@ class Toncenter:
 		return data.cycle_info.validators
 	#end define
 
+	def get_elections_list(self):
+		return with_buffer(self.local, self.do_get_elections_list)
+	#end define
+
 	def get_complaints_list(self):
 		return with_buffer(self.local, self.do_get_complaints_list)
 	#end define
@@ -62,6 +82,13 @@ class Toncenter:
 
 	def do_get_validation_cycles_list(self):
 		url = "https://elections.toncenter.com/getValidationCycles"
+		text = try_get_url(url)
+		data = json.loads(text)
+		return parse_dicts_in_list(data)
+	#end define
+
+	def do_get_elections_list(self):
+		url = "https://elections.toncenter.com/getElections"
 		text = try_get_url(url)
 		data = json.loads(text)
 		return parse_dicts_in_list(data)

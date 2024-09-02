@@ -49,7 +49,6 @@ def init():
 	# Start threads
 
 	local.start_cycle(message_sender, sec=1)
-	#local.start_cycle(scan_validators, sec=60)
 	local.start_cycle(scan_warnings, sec=60)
 #end define
 
@@ -74,73 +73,6 @@ def message_sender():
 	users = get_users(local)
 	for user in users:
 		user.send_messages(send_message)
-#end define
-
-def get_validator_status(adnl_addr):
-	data = dict()
-	data["isValidator"] = False
-	data["isSendTelemetry"] = False
-
-	# get data
-	nodes = toncenter.get_telemetry_list()
-	validators = toncenter.get_validators()
-
-	# Get validator info
-	for validator in validators:
-		itemAdnlAddr = validator.get("adnl_addr")
-		if adnl_addr == itemAdnlAddr:
-			# print("get_validator_status.validator:", json.dumps(validator))
-			data["isValidator"] = True
-			data["adnl_addr"] = adnl_addr
-			data["adnl_ending"] = adnl_addr[58:65]
-			data["pubkey"] = validator.get("pubkey")
-			data["weight"] = validator.get("weight")
-	#end for
-
-	# Get node info
-	for item in nodes:
-		itemAdnlAddr = item.get("adnl_address")
-		buff = item.get("data")
-		if adnl_addr == itemAdnlAddr:
-			data["isSendTelemetry"] = True
-			data["cpuLoad"] = buff.get("cpuLoad")
-			data["netLoad"] = buff.get("netLoad")
-			data["tps"] = buff.get("tps")
-			buffStatus = buff.get("validatorStatus")
-			if buffStatus:
-				data["isWorking"] = buffStatus.get("isWorking")
-				data["unixtime"] = buffStatus.get("unixtime")
-				data["masterchainblocktime"] = buffStatus.get("masterchainblocktime")
-				data["outOfSync"] = buffStatus.get("outOfSync")
-			#end if
-	#end for
-
-	# Set status
-	isWorking = data.get("isWorking")
-	outOfSync = data.get("outOfSync")
-	isValidator = data.get("isValidator")
-
-	status = None
-	# Если нода отправляет телеметрию
-	if outOfSync is not None:
-		# Если рассинхронизация > 300, или эффективность < 10, или нода не работает
-		if outOfSync > 300 or isWorking is False:
-			status = False
-		else:
-			status = True
-	#end if
-
-	# Set status icon
-	if status is True:
-		status_icon = "✅"
-	elif status is False:
-		status_icon = "❌"
-	else:
-		status_icon = ""
-	data["status_icon"] = status_icon
-	data["status"] = status
-
-	return data
 #end define
 
 def send_message(user, text, markdown=True):
@@ -177,7 +109,7 @@ def init_bot():
 	help_handler = CommandHandler("help", help_cmd)
 	status_handler = CommandHandler("status", status_cmd)
 	add_adnl_handler = CommandHandler("add_adnl", add_adnl_cmd)
-	#approve_adnl_handler = CommandHandler("approve_adnl", approve_adnl_cmd)
+	add_fullnode_adnl_handler = CommandHandler("add_fullnode_adnl", add_fullnode_adnl_cmd)
 	remove_adnl_handler = CommandHandler("remove_adnl", remove_adnl_cmd)
 	adnl_list_handler = CommandHandler("adnl_list", adnl_list_cmd)
 	add_warning_handler = CommandHandler("add_warning", add_warning_cmd)
@@ -191,7 +123,7 @@ def init_bot():
 	dispatcher.add_handler(help_handler)
 	dispatcher.add_handler(status_handler)
 	dispatcher.add_handler(add_adnl_handler)
-	#dispatcher.add_handler(approve_adnl_handler)
+	dispatcher.add_handler(add_fullnode_adnl_handler)
 	dispatcher.add_handler(remove_adnl_handler)
 	dispatcher.add_handler(adnl_list_handler)
 	dispatcher.add_handler(add_warning_handler)
@@ -249,12 +181,21 @@ def do_add_adnl_cmd(user, input_adnl, input_label):
 	if adnl is None:
 		output = f"ADNL not found: _{input_adnl}_"
 	else:
-		user_adnl_list = user.get_adnl_list()
-		user_adnl_list.append(adnl)
-		output = f"Ok, ADNL added: _{adnl}_"
-		if input_label is not None:
-			user_labels = user.get_labels()
-			user_labels[adnl] = input_label
+		output = user.add_adnl(adnl)
+		user.add_label(input_label)
+	send_message(user, output)
+#end define
+
+def add_fullnode_adnl_cmd(update, context):
+	user = User(local, update.effective_user.id)
+
+	try:
+		fullnode_adnl = context.args[0]
+	except:
+		error = "Bad args. Usage: `add_fullnode_adnl <fullnode_adnl>`"
+		send_message(user, error)
+		return
+	output = user.add_fullnode_adnl(fullnode_adnl)
 	send_message(user, output)
 #end define
 
@@ -316,30 +257,11 @@ def adnl_list_cmd(update, context):
 	send_message(user, output)
 #end define
 
-
 def status_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
-	input_args = context.args
-	input_item = get_item_from_list(input_args)
-
-	if input_item is None:
-		# Отобразить статусы своих валидаторов
-		data = get_my_status(user)
-		output = Status2TextWithFraction(data)
-	elif input_item == "all":
-		# Отобразить статусы всех валидаторов
-		data = GetAllStatus(user)
-		output = Status2TextWithFraction(data)
-	elif input_item == "died":
-		# Отобразить статусы мертвых валидаторов
-		data = GetDiedStatus(user)
-		output = Status2TextWithFraction(data)
-	else:
-		# Отобразить статус одного валидатора
-		data = GetOneStatus(user, input_item)
-		output = Status2Text(data)
-	#end if
+	data = get_my_status(user)
+	output = Status2TextWithFraction(data)
 
 	send_message(user, output)
 #end define
@@ -350,52 +272,10 @@ def get_my_status(user):
 	user_adnl_list = user.get_adnl_list()
 	result = list()
 	for adnl_addr in user_adnl_list:
-		data = get_validator_status(adnl_addr)
+		data = get_validator_status(user, adnl_addr)
 		data["label"] = user_labels.get(adnl_addr)
 		result.append(data)
 	return result
-#end define
-
-
-def GetAllStatus(user):
-	'''Отобразить статусы всех валидаторов'''
-	user_labels = user.get_labels()
-	validators_list = toncenter.get_validators_list()
-	result = list()
-	for adnl_addr in validators_list:
-		data = get_validator_status(adnl_addr)
-		data["label"] = user_labels.get(adnl_addr)
-		result.append(data)
-	return result
-#end define
-
-
-def GetDiedStatus(user):
-	'''Отобразить статусы мертвых валидаторов'''
-	user_labels = user.get_labels()
-	validators_list = toncenter.get_validators_list()
-	result = list()
-	for adnl_addr in validators_list:
-		data = get_validator_status(adnl_addr)
-		data["label"] = user_labels.get(adnl_addr)
-		if data["status"] is False:
-			result.append(data)
-	return result
-#end define
-
-def GetOneStatus(user, input_item):
-	'''Отобразить статус одного валидатора'''
-	user_labels = user.get_labels()
-	validators_list = toncenter.get_validators_list()
-	adnl_addr = find_text_in_list(validators_list, input_item)
-	data = get_validator_status(adnl_addr)
-	data["label"] = user_labels.get(adnl_addr)
-	if adnl_addr is None:
-		buff = len(input_item)
-		if buff > 6:
-			input_item = input_item[buff-6:]
-		data["adnl_ending"] = input_item
-	return data
 #end define
 
 def Status2TextWithFraction(data):
@@ -425,10 +305,10 @@ def Status2Text(item):
 	adnl_ending = item.get("adnl_ending")
 	isValidator = item.get("isValidator")
 	isSendTelemetry = item.get("isSendTelemetry")
+	telemetry_availability = item.get("telemetry_availability")
 	isWorking = item.get("isWorking", "unknown")
 	cpuLoad = item.get("cpuLoad")
 	netLoad = item.get("netLoad")
-	tps = item.get("tps")
 	outOfSync = item.get("outOfSync")
 	status_icon = item.get("status_icon")
 	if label:
@@ -438,13 +318,82 @@ def Status2Text(item):
 	if isValidator:
 		output += f"Send telemetry:  {isSendTelemetry}" + '\n'
 		output += f"Working:         {isWorking}" + '\n'
-	if isSendTelemetry:
+	if telemetry_availability:
 		output += f"Out of sync:     {outOfSync}" + '\n'
 		output += f"Cpu load:        {cpuLoad}" + '\n'
 		output += f"Net load:        {netLoad}" + '\n'
+	if telemetry_availability == False and isSendTelemetry == True:
+		output += "Warning: Telemetry is only available to validator owners. "
+		output += "Confirm node ownership with command /add_fullnode_adnl" + '\n'
 	output += '\n'
 	output = f"`{output}`"
 	return output
+#end define
+
+def get_validator_status(user, adnl_addr):
+	data = Dict()
+	data.isValidator = False
+	data.isSendTelemetry = False
+	data.telemetry_availability = False
+
+	# get data
+	validators = toncenter.get_validators()
+	user_fullnode_adnl_list = user.get_fullnode_adnl_list()
+
+	# Get validator info
+	for validator in validators:
+		itemAdnlAddr = validator.get("adnl_addr")
+		if adnl_addr == itemAdnlAddr:
+			# print("get_validator_status.validator:", json.dumps(validator))
+			data.isValidator = True
+			data.adnl_addr = adnl_addr
+			data.adnl_ending = adnl_addr[58:65]
+			data.pubkey = validator.get("pubkey")
+			data.weight = validator.get("weight")
+	#end for
+
+	# Get node info
+	node = toncenter.get_telemetry(user, adnl_addr)
+	data.isSendTelemetry = toncenter.is_send_telemetry(adnl_addr)
+	if node:
+		data.telemetry_availability = True
+		data.cpuLoad = node.data.cpuLoad
+		data.netLoad = node.data.netLoad
+		buffStatus = node.data.validatorStatus
+		if buffStatus:
+			data.isWorking = buffStatus.get("isWorking")
+			data.unixtime = buffStatus.get("unixtime")
+			data.masterchainblocktime = buffStatus.get("masterchainblocktime")
+			data.outOfSync = buffStatus.get("outOfSync")
+		#end if
+	#end if
+
+	# Set status
+	isWorking = data.get("isWorking")
+	outOfSync = data.get("outOfSync")
+	isValidator = data.get("isValidator")
+
+	status = None
+	# Если нода отправляет телеметрию
+	if outOfSync is not None:
+		# Если рассинхронизация > 300, или эффективность < 10, или нода не работает
+		if outOfSync > 300 or isWorking is False:
+			status = False
+		else:
+			status = True
+	#end if
+
+	# Set status icon
+	if status is True:
+		status_icon = "✅"
+	elif status is False:
+		status_icon = "❌"
+	else:
+		status_icon = ""
+	data["status_icon"] = status_icon
+	data["status"] = status
+
+	return data
 #end define
 
 def ListFraction(inputList, maxLen):
@@ -458,42 +407,6 @@ def ListFraction(inputList, maxLen):
 	if len(buff) > 0:
 		result.append(buff)
 	return result
-#end define
-
-def scan_validators():
-	users = get_users(local)
-	print("scan_validators.users:", json.dumps(users))
-	for user in users:
-		ScanUserValidators(user)
-#end define
-
-def ScanUserValidators(user):
-	data = get_my_status(user)
-	userAlarmList = user.get_alarm_list()
-	# print("ScanUserValidators.data:", json.dumps(data))
-	for item in data:
-		label = item.get("label")
-		status = item.get("status")
-		adnl_addr = item.get("adnl_addr")
-		adnl_ending = item.get("adnl_ending")
-		status_icon = item.get("status_icon")
-		if label:
-			labelText = f" ({label})"
-		else:
-			labelText = ""
-		if status is True:
-			if adnl_addr in userAlarmList:
-				userAlarmList.remove(adnl_addr)
-				output = "`[Info]`" + '\n'
-				output += f"The validator `...{adnl_ending}{labelText}` has restarted {status_icon}"
-				user.add_message(output)
-		elif status is False:
-			if adnl_addr not in userAlarmList:
-				userAlarmList.append(adnl_addr)
-				output = "`[Alarm]`" + '\n'
-				output += f"The validator `...{adnl_ending}{labelText}` went down {status_icon}"
-				user.add_message(output)
-		#end if
 #end define
 
 def scan_warnings():

@@ -15,15 +15,24 @@ class TelemetryWarning:
 
 	def check(self, user):
 		for adnl in user.get_adnl_list():
-			node = self.toncenter.get_telemetry(adnl)
+			node = self.toncenter.get_telemetry(user, adnl)
 			if node is None:
 				continue
-			self.check_out_of_sync(user, node)
-			self.check_cpu(user, node)
-			self.check_memory(user, node)
-			self.check_network(user, node)
-			self.check_disk(user, node)
-			self.check_uptime(user, node)
+			self.try_function(self.check_out_of_sync, user, node)
+			self.try_function(self.check_cpu, user, node)
+			self.try_function(self.check_memory, user, node)
+			self.try_function(self.check_network, user, node)
+			self.try_function(self.check_disk, user, node)
+			self.try_function(self.check_uptime, user, node)
+	#end define
+
+	def try_function(self, func, *args, **kwargs):
+		result = None
+		try:
+			result = func(*args, **kwargs)
+		except Exception as err:
+			self.local.add_log(f"{func.__name__} error: {err}", "error")
+		return result
 	#end define
 
 	def check_out_of_sync(self, user, node):
