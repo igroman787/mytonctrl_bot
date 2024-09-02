@@ -13,17 +13,24 @@ class Toncenter:
 
 	def get_validators_list(self):
 		result = list()
-		toncenter_data = self.get_telemetry()
 		validators = self.get_validators()
 		for item in validators:
 			adnl_addr = item.get("adnl_addr")
 			if adnl_addr:
 				result.append(adnl_addr)
-		print(f"get_validators_list {len(result)}")
 		return result
 	#end define
 
-	def get_telemetry(self):
+	def get_telemetry(self, adnl):
+		telemetry_list = self.get_telemetry_list()
+		for node in telemetry_list:
+			#print(f"get_telemetry: {node.adnl_addr}")
+			if node.adnl_address != adnl:
+				continue
+			return node
+	#end define
+
+	def get_telemetry_list(self):
 		return with_buffer(self.local, self.do_get_telemetry_list)
 	#end define
 

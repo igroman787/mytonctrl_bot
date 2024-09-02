@@ -15,13 +15,17 @@ from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 
 from utils import (
+	read_file,
 	get_config,
 	get_dict_from,
 	find_text_in_list,
 	get_item_from_list
 )
 from user import User, get_users
-from user_warnings.complaints_warning import ComplaintsWarning
+from user_warnings import (
+	ComplaintsWarning,
+	TelemetryWarning
+)
 from toncenter import Toncenter
 
 
@@ -51,7 +55,8 @@ def init():
 
 def init_warnings():
 	complaints_warning = ComplaintsWarning(local, toncenter)
-	local.buffer.possible_warnings = [complaints_warning]
+	telemetry_warning = TelemetryWarning(local, toncenter)
+	local.buffer.possible_warnings = [complaints_warning, telemetry_warning]
 	local.buffer.possible_warnings_list = list()
 	for item in local.buffer.possible_warnings:
 		local.buffer.possible_warnings_list.append(type(item).__name__)
@@ -77,7 +82,7 @@ def get_validator_status(adnl_addr):
 	data["isSendTelemetry"] = False
 
 	# get data
-	nodes = toncenter.get_telemetry()
+	nodes = toncenter.get_telemetry_list()
 	validators = toncenter.get_validators()
 
 	# Get validator info
@@ -172,9 +177,12 @@ def init_bot():
 	help_handler = CommandHandler("help", help_cmd)
 	status_handler = CommandHandler("status", status_cmd)
 	add_adnl_handler = CommandHandler("add_adnl", add_adnl_cmd)
+	#approve_adnl_handler = CommandHandler("approve_adnl", approve_adnl_cmd)
+	remove_adnl_handler = CommandHandler("remove_adnl", remove_adnl_cmd)
+	adnl_list_handler = CommandHandler("adnl_list", adnl_list_cmd)
 	add_warning_handler = CommandHandler("add_warning", add_warning_cmd)
-	del_handler = CommandHandler("del", del_cmd)
-	list_handler = CommandHandler("list", list_cmd)
+	#remove_warning_handler = CommandHandler("remove_warning", remove_warning_cmd)
+	#warning_list_handler = CommandHandler("warning_list", warning_list_cmd)
 	unknown_handler = MessageHandler(Filters.command, unknown_cmd)
 
 	# Add handlers
@@ -183,9 +191,12 @@ def init_bot():
 	dispatcher.add_handler(help_handler)
 	dispatcher.add_handler(status_handler)
 	dispatcher.add_handler(add_adnl_handler)
+	#dispatcher.add_handler(approve_adnl_handler)
+	dispatcher.add_handler(remove_adnl_handler)
+	dispatcher.add_handler(adnl_list_handler)
 	dispatcher.add_handler(add_warning_handler)
-	dispatcher.add_handler(del_handler)
-	dispatcher.add_handler(list_handler)
+	#dispatcher.add_handler(remove_warning_handler)
+	#dispatcher.add_handler(warning_list_handler)
 	dispatcher.add_handler(unknown_handler)
 
 	return updater
@@ -270,7 +281,7 @@ def do_add_warning_cmd(user, warning_type):
 	send_message(user, output)
 #end define
 
-def del_cmd(update, context):
+def remove_adnl_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
 	input_args = context.args
@@ -291,7 +302,7 @@ def del_cmd(update, context):
 	send_message(user, output)
 #end define
 
-def list_cmd(update, context):
+def adnl_list_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
 	user_adnl_list = user.get_adnl_list()
@@ -488,7 +499,14 @@ def ScanUserValidators(user):
 def scan_warnings():
 	users = get_users(local)
 	for user in users:
+		try_scan_user_warnings(user)
+#end define
+
+def try_scan_user_warnings(user):
+	try:
 		scan_user_warnings(user)
+	except Exception as er:
+		local.add_log(f"scan_user_warnings {user.id} error: {er}", "error")
 #end define
 
 def scan_user_warnings(user):
