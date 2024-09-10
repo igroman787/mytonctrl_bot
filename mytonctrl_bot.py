@@ -22,9 +22,10 @@ from utils import (
 	get_item_from_list
 )
 from user import User, get_users
-from user_warnings import (
-	ComplaintsWarning,
-	TelemetryWarning
+from user_alerts import (
+	ComplaintsAlert,
+	TelemetryAlert,
+	ComplaintsInformation
 )
 from toncenter import Toncenter
 
@@ -35,7 +36,7 @@ toncenter = Toncenter(local)
 
 
 def init():
-	init_warnings()
+	init_alerts()
 	init_buffer()
 
 	# Load translate table
@@ -49,17 +50,18 @@ def init():
 	# Start threads
 
 	local.start_cycle(message_sender, sec=1)
-	local.start_cycle(scan_warnings, sec=60)
+	local.start_cycle(scan_alerts, sec=60)
 #end define
 
-def init_warnings():
-	complaints_warning = ComplaintsWarning(local, toncenter)
-	telemetry_warning = TelemetryWarning(local, toncenter)
-	local.buffer.possible_warnings = [complaints_warning, telemetry_warning]
-	local.buffer.possible_warnings_list = list()
-	for item in local.buffer.possible_warnings:
-		local.buffer.possible_warnings_list.append(type(item).__name__)
-	local.buffer.possible_warnings_text = ", ".join(local.buffer.possible_warnings_list)
+def init_alerts():
+	complaints_alerts = ComplaintsAlert(local, toncenter)
+	telemetry_alerts = TelemetryAlert(local, toncenter)
+	complaints_information = ComplaintsInformation(local, toncenter)
+	local.buffer.possible_alerts = [complaints_alerts, telemetry_alerts, complaints_information]
+	local.buffer.possible_alerts_list = list()
+	for item in local.buffer.possible_alerts:
+		local.buffer.possible_alerts_list.append(type(item).__name__)
+	local.buffer.possible_alerts_text = ", ".join(local.buffer.possible_alerts_list)
 #end define
 
 def init_buffer():
@@ -112,9 +114,9 @@ def init_bot():
 	add_fullnode_adnl_handler = CommandHandler("add_fullnode_adnl", add_fullnode_adnl_cmd)
 	remove_adnl_handler = CommandHandler("remove_adnl", remove_adnl_cmd)
 	adnl_list_handler = CommandHandler("adnl_list", adnl_list_cmd)
-	add_warning_handler = CommandHandler("add_warning", add_warning_cmd)
-	#remove_warning_handler = CommandHandler("remove_warning", remove_warning_cmd)
-	#warning_list_handler = CommandHandler("warning_list", warning_list_cmd)
+	add_alert_handler = CommandHandler("add_alert", add_alert_cmd)
+	#remove_alert_handler = CommandHandler("remove_alert", remove_alert_cmd)
+	#alert_list_handler = CommandHandler("alert_list", alert_list_cmd)
 	unknown_handler = MessageHandler(Filters.command, unknown_cmd)
 
 	# Add handlers
@@ -126,9 +128,9 @@ def init_bot():
 	dispatcher.add_handler(add_fullnode_adnl_handler)
 	dispatcher.add_handler(remove_adnl_handler)
 	dispatcher.add_handler(adnl_list_handler)
-	dispatcher.add_handler(add_warning_handler)
-	#dispatcher.add_handler(remove_warning_handler)
-	#dispatcher.add_handler(warning_list_handler)
+	dispatcher.add_handler(add_alert_handler)
+	#dispatcher.add_handler(remove_alert_handler)
+	#dispatcher.add_handler(alert_list_handler)
 	dispatcher.add_handler(unknown_handler)
 
 	return updater
@@ -199,26 +201,17 @@ def add_fullnode_adnl_cmd(update, context):
 	send_message(user, output)
 #end define
 
-def add_warning_cmd(update, context):
+def add_alert_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
 	try:
-		warning_type = context.args[0]
+		alert_type = context.args[0]
 	except:
-		error = "Bad args. Usage: `add_warning <warning_type>`" + '\n'
-		error += f"Possible warnings: _{local.buffer.possible_warnings_text}_"
+		error = "Bad args. Usage: `add_alert <alert_type>`" + '\n'
+		error += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
 		send_message(user, error)
 		return
-	do_add_warning_cmd(user, warning_type)
-#end define
-
-def do_add_warning_cmd(user, warning_type):
-	if warning_type not in local.buffer.possible_warnings_list:
-		output = f"Warning not found. Possible warnings: _{local.buffer.possible_warnings_text}_"
-	else:
-		user_warnings_list = user.get_warnings_list()
-		user_warnings_list.append(warning_type)
-		output = f"Ok, warning added: _{warning_type}_"
+	output = user.add_alert(alert_type)
 	send_message(user, output)
 #end define
 
@@ -409,24 +402,24 @@ def ListFraction(inputList, maxLen):
 	return result
 #end define
 
-def scan_warnings():
+def scan_alerts():
 	users = get_users(local)
 	for user in users:
-		try_scan_user_warnings(user)
+		try_scan_user_alerts(user)
 #end define
 
-def try_scan_user_warnings(user):
+def try_scan_user_alerts(user):
 	try:
-		scan_user_warnings(user)
+		scan_user_alerts(user)
 	except Exception as er:
-		local.add_log(f"scan_user_warnings {user.id} error: {er}", "error")
+		local.add_log(f"scan_user_alerts {user.id} error: {er}", "error")
 #end define
 
-def scan_user_warnings(user):
-	user_warnings_list = user.get_warnings_list()
-	for warning in local.buffer.possible_warnings:
-		if type(warning).__name__ in user_warnings_list:
-			warning.check(user)
+def scan_user_alerts(user):
+	user_alerts_list = user.get_alerts_list()
+	for alert in local.buffer.possible_alerts:
+		if type(alert).__name__ in user_alerts_list:
+			alert.check(user)
 #end define
 
 

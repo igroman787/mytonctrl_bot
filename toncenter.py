@@ -12,6 +12,20 @@ class Toncenter:
 		self.local = local
 	#end define
 
+	def get_validator_efficiency(self, adnl, election_id):
+		efficiency_list = self.get_efficiency_list(election_id=election_id)
+		for validator in efficiency_list:
+			if validator.adnl_addr == adnl:
+				return validator.efficiency
+	#end define
+
+	def get_validator(self, adnl, past=False):
+		validators = self.get_validators(past=past)
+		for validator in validators:
+			if validator.adnl_addr == adnl:
+				return validator
+	#end define
+
 	def get_validators_list(self):
 		result = list()
 		validators = self.get_validators()
@@ -54,22 +68,34 @@ class Toncenter:
 		return with_buffer(self.local, self.do_get_validation_cycles_list)
 	#end define
 
-	def get_validation_cycle(self):
+	def get_validation_cycle(self, past=False):
 		data = self.get_validation_cycles_list()
-		return data[0]
+		if past:
+			return data[1]
+		else:
+			return data[0]
 	#end define
 
-	def get_validators(self):
-		data = self.get_validation_cycle()
+	def get_validators(self, past=False):
+		data = self.get_validation_cycle(past=past)
 		return data.cycle_info.validators
+	#end define
+
+	def get_election_data(self):
+		data = self.get_elections_list()
+		return data[0]
 	#end define
 
 	def get_elections_list(self):
 		return with_buffer(self.local, self.do_get_elections_list)
 	#end define
 
-	def get_complaints_list(self):
-		return with_buffer(self.local, self.do_get_complaints_list)
+	def get_complaints_list(self, election_id):
+		return with_buffer(self.local, self.do_get_complaints_list, election_id)
+	#end define
+
+	def get_efficiency_list(self, election_id):
+		return with_buffer(self.local, self.do_get_efficiency_list, election_id)
 	#end define
 
 	def do_get_telemetry_list(self):
@@ -81,7 +107,7 @@ class Toncenter:
 	#end define
 
 	def do_get_validation_cycles_list(self):
-		url = "https://elections.toncenter.com/getValidationCycles"
+		url = "https://elections.toncenter.com/getValidationCycles?limit=2"
 		text = try_get_url(url)
 		data = json.loads(text)
 		return parse_dicts_in_list(data)
@@ -94,11 +120,18 @@ class Toncenter:
 		return parse_dicts_in_list(data)
 	#end define
 
-	def do_get_complaints_list(self):
-		url = "https://elections.toncenter.com/getComplaints"
+	def do_get_complaints_list(self, election_id):
+		url = f"https://elections.toncenter.com/getComplaints?election_id={election_id}&limit=100"
 		text = try_get_url(url)
 		data = json.loads(text)
 		return parse_dicts_in_list(data)
+	#end define
+
+	def do_get_efficiency_list(self, election_id):
+		url = f"https://toncenter.com/api/qos/cycleScoreboard?cycle_id={election_id}&limit=1000"
+		text = try_get_url(url)
+		data = json.loads(text)
+		return Dict(data).scoreboard
 	#end define
 #end class
 

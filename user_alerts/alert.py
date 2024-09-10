@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 
-class Warning():
+class Alert():
 	def __init__(self, local, *args, **kwargs):
 		self.local = local
 	#end define

@@ -1,13 +1,28 @@
 `mytonctrl_bot` - This bot allows you to monitor the state of the validator.
 To start using the bot, add the validator address to the watch list.
-Instead of the full address of the validator, you can use the last few characters.
+ADNL address and Fullnode ADNL address you should take from the MyTonCtrl status
 
 ```
-/add <adnl>     - Add a validator to your the watch list.
-/del <adnl>     - Remove the validator from your the watch list.
-/list           - Show the list of validators you are subscribed to.
-/status         - Show the status of the validators you subscribe to.
-/status <adnl>  - Show validator status at its address.
-/status all     - Show status of all validators.
-/status died    - Show status of dead validators
+/status - Show the status of the validators you are subscribed to
+/add_adnl - Add ADNL address to subscriptions
+/add_fullnode_adnl - Add fullnode ADNL address to access its telemetry
+/remove_adnl - Remove ADNL from subscriptions
+/adnl_list - Show list of subscriptions
+/add_alert - Add warning check to your validators
+/remove_alert - Remove warning check to your validators
+/alert_list - Show list of active warnings
 ```
+
+
+**Example**:
+Add ADNL address to subscriptions. Instead of the full address of the validator, you can use the last few characters:
+`/add_adnl 4F59`
+
+Add a Fullnode ADNL to display node telemetry. Without telemetry `TelemetryAlert` will not work:
+`/add_fullnode_adnl 184FE843EE98F1C43087BFDB5F948A684AAC5BF1D2031308A6F5DA34174C615A`
+
+Now we can see the status of our added validator. There can be several validators:
+`/status`
+
+We will also add alarms if a complaint has been created against us:
+`/add_alert ComplaintsAlert`

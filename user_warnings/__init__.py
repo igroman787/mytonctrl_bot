@@ -1,2 +1,0 @@
-from user_warnings.telemetry_warning import TelemetryWarning
-from user_warnings.complaints_warning import ComplaintsWarning
