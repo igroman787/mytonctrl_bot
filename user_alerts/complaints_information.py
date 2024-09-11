@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf_8 -*-
 
-from mypylib.mypylib import get_timestamp, timestamp2datetime
+import time
+from mypylib.mypylib import get_timestamp
 
 
 class ComplaintsInformation:
@@ -14,14 +15,20 @@ class ComplaintsInformation:
 
 	def check(self, user):
 		past_validation_cycle = self.toncenter.get_validation_cycle(past=True)
-		complaints_list = self.toncenter.get_complaints_list(past_validation_cycle.cycle_id)
+		election_id = past_validation_cycle.cycle_id
+		utime_until = past_validation_cycle.cycle_info.utime_until
+		if get_timestamp() < utime_until + 900:
+			return
+		#end if
+
+		complaints_list = self.toncenter.get_complaints_list(election_id)
 		complaints = list()
 		for complaint in complaints_list:
 			if complaint.is_passed != True:
 				continue
 			complaints.append(complaint)
 		complaints.reverse()
-		self.inform(user, past_validation_cycle.cycle_id, past_validation_cycle.utime_until, complaints)
+		self.inform(user, election_id, utime_until, complaints)
 	#end define
 
 	def inform(self, user, election_id, utime_until, complaints):
@@ -29,11 +36,13 @@ class ComplaintsInformation:
 		triggered_alerts_list = user.get_triggered_alerts_list()
 		if alert_name in triggered_alerts_list:
 			return
+		if len(complaints) == 0:
+			return
 		#end if
 
 		text = f"*Penalties for round {election_id}*" + '\n'
-		text += f"Round's started: *{timestamp2datetime(election_id)}*" + '\n'
-		text += f"Round's over: *{timestamp2datetime(utime_until)}*" + '\n'
+		text += f"Round's started: *{timestamp2utcdatetime(election_id)}*" + '\n'
+		text += f"Round's over: *{timestamp2utcdatetime(utime_until)}*" + '\n'
 		text += '\n'
 		
 		for complaint in complaints:
@@ -55,3 +64,9 @@ class ComplaintsInformation:
 		return text
 	#end define
 #end class
+
+def timestamp2utcdatetime(timestamp, format="%d.%m.%Y %H:%M:%S"):
+	datetime = time.gmtime(timestamp)
+	result = time.strftime(format, datetime) + ' UTC'
+	return result
+#end define

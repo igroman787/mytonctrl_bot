@@ -141,7 +141,7 @@ def echo_cmd(update, context):
 	#input = context.args
 	user = User(local, update.effective_user.id)
 	output = "Technical support for validators: @mytonctrl_help_bot"
-	send_message(user, output)
+	send_message(user, output, markdown=False)
 #end define
 
 def unknown_cmd(update, context):
