@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf_8 -*-
 
+import sys
 import time
 import json
-import threading
 import urllib.request
-from mypylib.mypylib import MyPyClass, Dict, get_timestamp
+from mypylib.mypylib import (
+	MyPyClass,
+	Dict,
+	get_timestamp,
+	get_git_hash
+)
 
 # Telegram components
 #pip3 install python-telegram-bot==13.7
 from telegram import Bot, ParseMode
-from telegram.ext import Updater
-from telegram.ext import CommandHandler
-from telegram.ext import MessageHandler, Filters
+from telegram.error import BadRequest
+from telegram.utils.helpers import escape_markdown
+from telegram.ext import (
+	Updater,
+	CommandHandler,
+	MessageHandler,
+	Filters,
+)
 
 from utils import (
 	read_file,
@@ -21,7 +31,12 @@ from utils import (
 	find_text_in_list,
 	get_item_from_list
 )
-from user import User, get_users
+from user import (
+	User,
+	get_users,
+	get_active_users,
+	inform_admins
+)
 from user_alerts import (
 	ComplaintsAlert,
 	TelemetryAlert,
@@ -48,7 +63,6 @@ def init():
 	local.run()
 
 	# Start threads
-
 	local.start_cycle(message_sender, sec=1)
 	local.start_cycle(scan_alerts, sec=60)
 #end define
@@ -69,6 +83,9 @@ def init_buffer():
 	data = get_config(config_path)
 	local.buffer.telegram_bot_token = data.telegram_bot_token
 	local.buffer.api_key = data.api_key
+	local.db.delay = data.delay if type(data.delay) == int else 60
+	local.buffer.admins = data.admins if type(data.admins) == list else list()
+	local.buffer.version = get_git_hash(local.buffer.my_dir, short=True)
 #end define
 
 def message_sender():
@@ -77,24 +94,27 @@ def message_sender():
 		user.send_messages(send_message)
 #end define
 
-def send_message(user, text, markdown=True):
+def send_message(user, text):
 	# print(f"send_message user: {user.id}, text: {text}")
 	if len(text) == 0:
 		text = "No result"
 	if type(text) == str:
-		send_message_work(user, text, markdown)
+		do_send_message(user, text)
 	elif type(text) == list:
 		for item in text:
-			send_message_work(user, item, markdown)
+			do_send_message(user, item)
 #end define
 
-def send_message_work(user, text, markdown=True):
-	# print("send_message_work.text:", json.dumps(text))
+def do_send_message(user, text):
+	# print(f"do_send_message.text: `{text}`")
 	# context.bot.sendMessage(user.id=user.id, text=text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True, disable_notification=True)
-	parse_mode = None
-	if markdown == True:
-		parse_mode = ParseMode.MARKDOWN
-	local.buffer.updater.bot.sendMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_web_page_preview=True, disable_notification=True)
+	try:
+		local.buffer.updater.bot.sendMessage(chat_id=user.id, text=text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True, disable_notification=True)
+	except BadRequest as ex:
+		if ex.message == "Chat not found":
+			user.delete()
+		else:
+			raise BadRequest(ex)
 #end define
 
 def init_bot():
@@ -107,6 +127,7 @@ def init_bot():
 
 	# Create handlers
 	echo_handler = MessageHandler(Filters.text & (~Filters.command), echo_cmd)
+	
 	start_handler = CommandHandler("start", start_cmd)
 	help_handler = CommandHandler("help", help_cmd)
 	status_handler = CommandHandler("status", status_cmd)
@@ -115,11 +136,21 @@ def init_bot():
 	remove_adnl_handler = CommandHandler("remove_adnl", remove_adnl_cmd)
 	adnl_list_handler = CommandHandler("adnl_list", adnl_list_cmd)
 	add_alert_handler = CommandHandler("add_alert", add_alert_cmd)
-	#remove_alert_handler = CommandHandler("remove_alert", remove_alert_cmd)
-	#alert_list_handler = CommandHandler("alert_list", alert_list_cmd)
+	remove_alert_handler = CommandHandler("remove_alert", remove_alert_cmd)
+	alert_list_handler = CommandHandler("alert_list", alert_list_cmd)
+
+	me_handler = CommandHandler("me", me_cmd)
+	bot_handler = CommandHandler("bot", bot_cmd)
+	add_notification_handler = CommandHandler("add_notification", add_notification_cmd)
+	print_notification_handler = CommandHandler("print_notification", print_notification_cmd)
+	start_notification_handler = CommandHandler("start_notification", start_notification_cmd)
+	stop_notification_handler = CommandHandler("stop_notification", stop_notification_cmd)
+	
+
 	unknown_handler = MessageHandler(Filters.command, unknown_cmd)
 
 	# Add handlers
+	
 	dispatcher.add_handler(echo_handler)
 	dispatcher.add_handler(start_handler)
 	dispatcher.add_handler(help_handler)
@@ -129,8 +160,17 @@ def init_bot():
 	dispatcher.add_handler(remove_adnl_handler)
 	dispatcher.add_handler(adnl_list_handler)
 	dispatcher.add_handler(add_alert_handler)
-	#dispatcher.add_handler(remove_alert_handler)
-	#dispatcher.add_handler(alert_list_handler)
+	dispatcher.add_handler(remove_alert_handler)
+	dispatcher.add_handler(alert_list_handler)
+
+	dispatcher.add_handler(me_handler)
+	dispatcher.add_handler(bot_handler)
+	dispatcher.add_handler(add_notification_handler)
+	dispatcher.add_handler(print_notification_handler)
+	dispatcher.add_handler(start_notification_handler)
+	dispatcher.add_handler(stop_notification_handler)
+	
+
 	dispatcher.add_handler(unknown_handler)
 
 	return updater
@@ -141,13 +181,13 @@ def echo_cmd(update, context):
 	#input = context.args
 	user = User(local, update.effective_user.id)
 	output = "Technical support for validators: @mytonctrl_help_bot"
-	send_message(user, output, markdown=False)
+	send_message(user, escape_markdown(output))
 #end define
 
 def unknown_cmd(update, context):
 	user = User(local, update.effective_user.id)
 	output = "Sorry, I didn't understand that command."
-	send_message(user, output)
+	send_message(user, escape_markdown(output))
 #end define
 
 def start_cmd(update, context):
@@ -164,6 +204,124 @@ def help_cmd(update, context):
 	send_message(user, output)
 #end define
 
+def me_cmd(update, context):
+	user = User(local, update.effective_user.id)
+	output = f"User: `{user.id}`" + '\n'
+	if user.is_admin() == True:
+		text = "Available commands: /add_notification, /print_notification, /start_notification, /stop_notification"
+		output += escape_markdown(text)
+	send_message(user, output)
+#end define
+
+def bot_cmd(update, context):
+	user = User(local, update.effective_user.id)
+	if user.is_admin() == False:
+		unknown_cmd(update, context)
+		return
+	#end if
+
+	active_users = get_active_users(local)
+	db_size = round(sys.getsizeof(local.db)/10**6, 2)
+	buffer_size = round(sys.getsizeof(local.buffer)/10**6, 2)
+	output = f"version: `{local.buffer.version}`" + '\n'
+	output += f"users: `{len(active_users)}/{len(local.db.users)}`" + '\n'
+	output += f"db size: `{db_size} Mb`" + '\n'
+	output += f"buffer size: `{buffer_size} Mb`" + '\n'
+	send_message(user, output)
+#end define
+
+def add_notification_cmd(update, context):
+	user = User(local, update.effective_user.id)
+	if user.is_admin() == False:
+		unknown_cmd(update, context)
+		return
+	#end if
+
+	text = update.message.text_markdown
+	if '\n' in text:
+		notification = text[text.find('\n') + 1:]
+	elif ' ' in text:
+		notification = text[text.find(' ') + 1:]
+	else:
+		notification = None
+	#end if
+
+	if len(notification) > 0:
+		local.db.notification = notification
+		output = "Notification added"
+	else:
+		output = "Empty notification"
+	send_message(user, output)
+#end define
+
+def print_notification_cmd(update, context):
+	user = User(local, update.effective_user.id)
+	if user.is_admin() == False:
+		unknown_cmd(update, context)
+		return
+	#end if
+
+	if local.db.notification == None or len(local.db.notification) == 0:
+		output = "Empty notification"
+		send_message(user, output)
+		return
+	#end if
+
+	send_message(user, local.db.notification)
+#end define
+
+def start_notification_cmd(update, context):
+	username = escape_markdown('@' + update.effective_user.username)
+	user = User(local, update.effective_user.id)
+	if user.is_admin() == False:
+		unknown_cmd(update, context)
+		return
+	#end if
+
+	if local.db.notification == None or len(local.db.notification) == 0:
+		output = "Empty notification"
+		send_message(user, output)
+		return
+	#end if
+
+	if local.buffer.notification_sending == True:
+		output = "Already started"
+		send_message(user, output)
+		return
+	#end if
+
+	local.start_thread(do_notification_sending)
+	local.buffer.notification_sending = True
+	output = f"Start notification sending by {username} in {local.db.delay} seconds"
+	inform_admins(local, output)
+#end define
+
+def do_notification_sending():
+	time.sleep(local.db.delay)
+	if local.db.notification == None or len(local.db.notification) == 0:
+		return
+	#end if
+
+	active_users = get_active_users(local)
+	for user_id, user in active_users.items():
+		user.add_message(local.db.notification)
+	local.db.notification = None
+	local.buffer.notification_sending = None
+#end define
+
+def stop_notification_cmd(update, context):
+	username = escape_markdown('@' + update.effective_user.username)
+	user = User(local, update.effective_user.id)
+	if user.is_admin() == False:
+		unknown_cmd(update, context)
+		return
+	#end if
+
+	local.db.notification = None
+	output = f"Stop notification sending by {username}"
+	send_message(user, output)
+#end define
+
 def add_adnl_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
@@ -177,14 +335,51 @@ def add_adnl_cmd(update, context):
 	do_add_adnl_cmd(user, adnl, label)
 #end define
 
-def do_add_adnl_cmd(user, input_adnl, input_label):
-	validators_list = toncenter.get_validators_list()
-	adnl = find_text_in_list(validators_list, input_adnl)
-	if adnl is None:
-		output = f"ADNL not found: _{input_adnl}_"
-	else:
+def do_add_adnl_cmd(user, adnl, label):
+	#validators_list = toncenter.get_validators_list()
+	nodes_list = toncenter.get_nodes_list()
+	if adnl in nodes_list:
 		output = user.add_adnl(adnl)
-		user.add_label(input_label)
+		user.add_label(adnl, label)
+	else:
+		output = f"_{adnl}_ not found"
+	send_message(user, output)
+#end define
+
+def remove_adnl_cmd(update, context):
+	user = User(local, update.effective_user.id)
+	user_adnl_list = user.get_adnl_list()
+	#user_adnl_list_text = ", ".join(user_adnl_list)
+
+	try:
+		adnl = context.args[0]
+	except:
+		error = "Bad args. Usage: `remove_adnl <adnl>`" + '\n'
+		#error += f"User adnl list: _{user_adnl_list_text}_"
+		send_message(user, error)
+		return
+	#end try
+
+	if adnl in user_adnl_list:
+		user_adnl_list.remove(adnl)
+		output = f"_{adnl}_ is delated"
+	else:
+		output = f"_{adnl}_ not found" + 'n'
+		#output += f"User adnl list: _{user_adnl_list_text}_"
+	send_message(user, output)
+#end define
+
+def adnl_list_cmd(update, context):
+	user = User(local, update.effective_user.id)
+
+	user_adnl_list = user.get_adnl_list()
+	user_labels = user.get_labels()
+	output = ""
+	for adnl in user_adnl_list:
+		label = user_labels.get(adnl, "")
+		output += f"`{adnl} {label}`" + '\n'
+	# output = json.dumps(user_adnl_list, indent=2)
+	# output = f"`{output}`"
 	send_message(user, output)
 #end define
 
@@ -215,47 +410,42 @@ def add_alert_cmd(update, context):
 	send_message(user, output)
 #end define
 
-def remove_adnl_cmd(update, context):
+def remove_alert_cmd(update, context):
 	user = User(local, update.effective_user.id)
+	user_alert_list = user.get_alert_list()
+	#user_alert_text = ", ".join(user_alert_list)
 
-	input_args = context.args
-	input_item = get_item_from_list(input_args)
+	try:
+		alert_type = context.args[0]
+	except:
+		error = "Bad args. Usage: `remove_alert <alert_type>`" + '\n'
+		#error += f"User alerts: _{user_alert_text}_"
+		send_message(user, error)
+		return
+	#end try
 
-	user_adnl_list = user.get_adnl_list()
-	user_labels = user.get_labels()
-	adnl = find_text_in_list(user_adnl_list, input_item)
-	if input_item is None:
-		output = "error"
-	elif adnl is None:
-		output = "error2"
+	if alert_type in user_alert_list:
+		user_alert_list.remove(alert_type)
+		output = f"_{alert_type}_ is delated"
 	else:
-		user_adnl_list.remove(adnl)
-		if adnl in user_labels:
-			user_labels.pop(adnl)
-		output = "ok"
+		output = f"_{alert_type}_ not found" + 'n'
+		#output += f"User alerts: _{user_alert_text}_"
 	send_message(user, output)
 #end define
 
-def adnl_list_cmd(update, context):
+def alert_list_cmd(update, context):
 	user = User(local, update.effective_user.id)
-
-	user_adnl_list = user.get_adnl_list()
-	user_labels = user.get_labels()
-	output = ""
-	for adnl in user_adnl_list:
-		label = user_labels.get(adnl, "")
-		output += f"`{adnl} {label}`"
-	# output = json.dumps(user_adnl_list, indent=2)
-	# output = f"`{output}`"
+	user_alert_list = user.get_alert_list()
+	user_alert_text = ", ".join(user_alert_list)
+	output = f"User alerts: _{user_alert_text}_" + '\n'
+	output += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
 	send_message(user, output)
 #end define
 
 def status_cmd(update, context):
 	user = User(local, update.effective_user.id)
-
 	data = get_my_status(user)
 	output = Status2TextWithFraction(data)
-
 	send_message(user, output)
 #end define
 
@@ -273,7 +463,7 @@ def get_my_status(user):
 
 def Status2TextWithFraction(data):
 	result = list()
-	buff = ListFraction(data, 16)
+	buff = list_fraction(data, 16)
 	# print("Status2TextWithFraction.data:", json.dumps(data))
 	# print("Status2TextWithFraction.buff:", json.dumps(buff))
 	for item in buff:
@@ -293,31 +483,31 @@ def StatusList2Text(data):
 def Status2Text(item):
 	output = ""
 	# print("Status2Text.item:", json.dumps(item))
-	label = item.get("label")
-	adnl_addr = item.get("adnl_addr")
-	adnl_ending = item.get("adnl_ending")
-	isValidator = item.get("isValidator")
-	isSendTelemetry = item.get("isSendTelemetry")
-	telemetry_availability = item.get("telemetry_availability")
-	isWorking = item.get("isWorking", "unknown")
-	cpuLoad = item.get("cpuLoad")
-	netLoad = item.get("netLoad")
-	outOfSync = item.get("outOfSync")
-	status_icon = item.get("status_icon")
-	if label:
-		output += f"Label:            {label}" + '\n'
-	output += f"ADNL:            ...{adnl_ending} `{status_icon}`" + '\n'
-	output += f"Validator:       {isValidator}" + '\n'
-	if isValidator:
-		output += f"Send telemetry:  {isSendTelemetry}" + '\n'
-		output += f"Working:         {isWorking}" + '\n'
-	if telemetry_availability:
-		output += f"Out of sync:     {outOfSync}" + '\n'
-		output += f"Cpu load:        {cpuLoad}" + '\n'
-		output += f"Net load:        {netLoad}" + '\n'
-	if telemetry_availability == False and isSendTelemetry == True:
-		output += "Warning: Telemetry is only available to validator owners. "
-		output += "Confirm node ownership with command /add_fullnode_adnl" + '\n'
+	#label = item.get("label")
+	#adnl_addr = item.get("adnl_addr")
+	#adnl_short = item.get("adnl_short")
+	#is_validator = item.get("is_validator")
+	#is_send_telemetry = item.get("is_send_telemetry")
+	#telemetry_availability = item.get("telemetry_availability")
+	#isWorking = item.get("isWorking", "unknown")
+	#cpuLoad = item.get("cpuLoad")
+	#netLoad = item.get("netLoad")
+	#outOfSync = item.get("outOfSync")
+	#status_icon = item.get("status_icon")
+	if item.label:
+		output += f"Label:            {item.label}" + '\n'
+	output += f"ADNL:            {item.adnl_short}... `{item.status_icon}`" + '\n'
+	output += f"Validator:       {item.is_validator}" + '\n'
+	output += f"Send telemetry:  {item.is_send_telemetry}" + '\n'
+	if item.is_validator:
+		output += f"Working:         {item.isWorking}" + '\n'
+	if item.telemetry_availability:
+		output += f"Out of sync:     {item.outOfSync}" + '\n'
+		output += f"Cpu load:        {item.cpuLoad}" + '\n'
+		output += f"Net load:        {item.netLoad}" + '\n'
+	#if item.telemetry_availability == False and item.is_send_telemetry == True:
+	#	output += "Warning: Telemetry is only available to validator owners. "
+	#	output += "Confirm node ownership with command /add_fullnode_adnl" + '\n'
 	output += '\n'
 	output = f"`{output}`"
 	return output
@@ -325,8 +515,10 @@ def Status2Text(item):
 
 def get_validator_status(user, adnl_addr):
 	data = Dict()
-	data.isValidator = False
-	data.isSendTelemetry = False
+	data.adnl_addr = adnl_addr
+	data.adnl_short = adnl_addr[0:7]
+	data.is_validator = False
+	data.is_send_telemetry = False
 	data.telemetry_availability = False
 
 	# get data
@@ -338,33 +530,33 @@ def get_validator_status(user, adnl_addr):
 		itemAdnlAddr = validator.get("adnl_addr")
 		if adnl_addr == itemAdnlAddr:
 			# print("get_validator_status.validator:", json.dumps(validator))
-			data.isValidator = True
-			data.adnl_addr = adnl_addr
-			data.adnl_ending = adnl_addr[58:65]
+			data.is_validator = True
+			#data.adnl_addr = adnl_addr
+			#data.adnl_ending = adnl_addr[58:65]
 			data.pubkey = validator.get("pubkey")
 			data.weight = validator.get("weight")
 	#end for
 
 	# Get node info
 	node = toncenter.get_telemetry(user, adnl_addr)
-	data.isSendTelemetry = toncenter.is_send_telemetry(adnl_addr)
+	data.is_send_telemetry = toncenter.is_send_telemetry(adnl_addr)
 	if node:
 		data.telemetry_availability = True
 		data.cpuLoad = node.data.cpuLoad
 		data.netLoad = node.data.netLoad
-		buffStatus = node.data.validatorStatus
-		if buffStatus:
-			data.isWorking = buffStatus.get("isWorking")
-			data.unixtime = buffStatus.get("unixtime")
-			data.masterchainblocktime = buffStatus.get("masterchainblocktime")
-			data.outOfSync = buffStatus.get("outOfSync")
+		buff_status = node.data.validatorStatus
+		if buff_status:
+			data.isWorking = buff_status.get("isWorking")
+			data.unixtime = buff_status.get("unixtime")
+			data.masterchainblocktime = buff_status.get("masterchainblocktime")
+			data.outOfSync = buff_status.get("outOfSync")
 		#end if
 	#end if
 
 	# Set status
 	isWorking = data.get("isWorking")
 	outOfSync = data.get("outOfSync")
-	isValidator = data.get("isValidator")
+	is_validator = data.get("is_validator")
 
 	status = None
 	# Если нода отправляет телеметрию
@@ -389,11 +581,11 @@ def get_validator_status(user, adnl_addr):
 	return data
 #end define
 
-def ListFraction(inputList, maxLen):
+def list_fraction(input_list, max_len):
 	buff = list()
 	result = list()
-	for item in inputList:
-		if len(buff) == maxLen:
+	for item in input_list:
+		if len(buff) == max_len:
 			result.append(buff)
 			buff = list()
 		buff.append(item)
@@ -416,9 +608,9 @@ def try_scan_user_alerts(user):
 #end define
 
 def scan_user_alerts(user):
-	user_alerts_list = user.get_alerts_list()
+	user_alert_list = user.get_alert_list()
 	for alert in local.buffer.possible_alerts:
-		if type(alert).__name__ in user_alerts_list:
+		if type(alert).__name__ in user_alert_list:
 			alert.check(user)
 #end define
 

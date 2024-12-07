@@ -62,7 +62,7 @@ class User:
 		return self.get_data("labels")
 	#end define
 
-	def get_alerts_list(self):
+	def get_alert_list(self):
 		return self.get_data("alerts_list", list)
 	#end define
 
@@ -106,10 +106,16 @@ class User:
 		return text
 	#end define
 
-	def add_label(self, label):
-		if label is not None:
-			user_labels = self.get_labels()
-			user_labels[adnl] = label
+	def add_label(self, adnl, label):
+		user_labels = self.get_labels()
+		error = self.check_entry_in_list(label, user_labels)
+		if error:
+			return error
+		if label is None:
+			return
+		if len(label) > 10:
+			return
+		user_labels[adnl] = label
 	#end define
 
 	def add_alert(self, name):
@@ -130,6 +136,17 @@ class User:
 			text = "The maximum number of elements has been reached."
 			return text
 	#end define
+
+	def is_admin(self):
+		admins = [str(admin) for admin in self.local.buffer.admins]
+		if self.id in admins:
+			return True
+		return False
+	#end define
+
+	def delete(self):
+		del self.local.db.users[self.id]
+	#end define
 #end class
 
 
@@ -140,8 +157,20 @@ def get_users(local):
 	return users
 #end define
 
+def get_active_users(local):
+	users = dict()
+	for user_id, user in local.db.users.items():
+		if ((user.adnl_list and len(user.adnl_list) > 0) or
+			(user.alerts_list and len(user.alerts_list) > 0)):
+			users[user_id] = User(local, user_id)
+	return users
+#end define
+
 def get_users_dict_from(db_or_buffer):
 	return get_dict_from(db_or_buffer, "users")
 #end define
 
-
+def inform_admins(local, text):
+	for user_id in local.buffer.admins:
+		User(local, user_id).add_message(text)
+#end define

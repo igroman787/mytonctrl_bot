@@ -36,6 +36,16 @@ class Toncenter:
 		return result
 	#end define
 
+	def get_nodes_list(self):
+		result = list()
+		telemetry_list = self.get_telemetry_list()
+		for node in telemetry_list:
+			if node.adnl_address in result:
+				continue
+			result.append(node.adnl_address)
+		return result
+	#end define
+
 	def get_telemetry(self, user, adnl):
 		node = self.do_get_telemetry(adnl)
 		if node is None:
