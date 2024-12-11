@@ -23,7 +23,7 @@ class User:
 		return user_db
 	#end define
 
-	def get_data(self, name, type=Dict):
+	def get_data_from_db(self, name, type=Dict):
 		user_db = self.get_db()
 		data = user_db.get(name)
 		if data is None:
@@ -51,19 +51,19 @@ class User:
 	#end define
 
 	def get_adnl_list(self):
-		return self.get_data("adnl_list", list)
+		return self.get_data_from_db("adnl_list", list)
 	#end define
 
 	def get_fullnode_adnl_list(self):
-		return self.get_data("fullnode_adnl_list", list)
+		return self.get_data_from_db("fullnode_adnl_list", list)
 	#end define
 
 	def get_labels(self):
-		return self.get_data("labels")
+		return self.get_data_from_db("labels")
 	#end define
 
-	def get_alert_list(self):
-		return self.get_data("alerts_list", list)
+	def get_alerts_list(self):
+		return self.get_data_from_db("alerts_list", list)
 	#end define
 
 	def get_triggered_alerts_list(self):

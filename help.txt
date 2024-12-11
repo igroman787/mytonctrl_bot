@@ -15,7 +15,7 @@ ADNL address and Fullnode ADNL address you should take from the MyTonCtrl status
 
 
 **Example**:
-Add ADNL address to subscriptions. Instead of the full address of the validator, you can use the last few characters:
+Add ADNL address to subscriptions. Instead of the full address of the validator:
 `/add_adnl 1B4C7485C34EED9DD95E17F8032AD8E02FAD92264DE431AD8BDB5BE6AA194F59`
 
 Add a Fullnode ADNL to display node telemetry:

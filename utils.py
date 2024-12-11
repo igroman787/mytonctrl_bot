@@ -40,7 +40,8 @@ def get_url(url):
 
 def with_buffer(local, func, *args, **kwargs):
 	# Get buffer
-	buffer_name = func.__name__
+	buffer_hash = hash(f"{args}_{kwargs}")
+	buffer_name = f"{func.__name__}_{buffer_hash}"
 	buff = get_function_buffer(local, buffer_name, timeout=60)
 	if buff:
 		return buff
@@ -102,4 +103,13 @@ def get_dict_from(db_or_buffer, name):
 		users = Dict()
 		db_or_buffer[name] = users
 	return users
+#end define
+
+def get_adnl_text(user, adnl_addr):
+	user_labels = user.get_labels()
+	label = user_labels.get(adnl_addr)
+	label_text = f" ({label})" if label else ''
+	adnl_short = adnl_addr[0:7]
+	adnl_text = f"{adnl_short}...{label_text}"
+	return adnl_text
 #end define

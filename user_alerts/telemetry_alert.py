@@ -3,6 +3,7 @@
 
 import os
 from mypylib.mypylib import get_timestamp
+from utils import get_adnl_text
 
 
 class TelemetryAlert:
@@ -91,16 +92,16 @@ class TelemetryAlert:
 		pass
 	#end define
 
-	def warn(self, name, user, adnl, *args, direct=True):
-		alert_name = f"{type(self).__name__}_{name}_{adnl}"
+	def warn(self, name, user, adnl_addr, *args, direct=True):
+		alert_name = f"{type(self).__name__}-{name}-{adnl_addr}"
 		triggered_alerts_list = user.get_triggered_alerts_list()
 		if (alert_name in triggered_alerts_list) is direct:
 			return
-		adnl_ending = adnl[58:65]
+		adnl_text = get_adnl_text(user, adnl_addr)
 		status = "overloaded" if direct else "ok"
 		text = f"Validator {name} is {status}:" + '\n'
 		text += "```" + '\n'
-		text += f"ADNL: ...{adnl_ending}" + '\n'
+		text += f"ADNL: {adnl_text}" + '\n'
 		text += f"{name}: {args[0]} /{args[1]}" + '\n'
 		text += "```"
 		user.add_message(text)

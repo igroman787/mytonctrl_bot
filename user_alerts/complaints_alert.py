@@ -2,6 +2,7 @@
 # -*- coding: utf_8 -*-
 
 from mypylib.mypylib import get_timestamp
+from utils import get_adnl_text
 
 
 class ComplaintsAlert:
@@ -23,16 +24,19 @@ class ComplaintsAlert:
 	#end define
 
 	def warn(self, user, complaint):
-		alert_name = f"{type(self).__name__}-{complaint.election_id}"
+		alert_name = f"{type(self).__name__}-{complaint.election_id}-{complaint.adnl_addr}"
 		triggered_alerts_list = user.get_triggered_alerts_list()
 		if alert_name in triggered_alerts_list:
 			return
-		adnl_ending = complaint.adnl_addr[58:65]
+		#end if
+		
+		adnl_text = get_adnl_text(user, complaint.adnl_addr)
+		fine = complaint.suggested_fine // 10**9
 		alert_text = "The validator has been fined:" + '\n'
 		alert_text += "```" + '\n'
-		alert_text += f"ADNL: ...{adnl_ending}" + '\n'
+		alert_text += f"ADNL: {adnl_text}" + '\n'
 		alert_text += f"election: {complaint.election_id}" + '\n'
-		alert_text += f"fine: {complaint.suggested_fine//10**9} TON" + '\n'
+		alert_text += f"fine: {fine} TON" + '\n'
 		alert_text += "```"
 		user.add_message(alert_text)
 		triggered_alerts_list[alert_name] = self

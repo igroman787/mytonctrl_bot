@@ -40,7 +40,8 @@ from user import (
 from user_alerts import (
 	ComplaintsAlert,
 	TelemetryAlert,
-	ComplaintsInformation
+	ComplaintsInformation,
+	ElectionsInformation
 )
 from toncenter import Toncenter
 
@@ -71,7 +72,8 @@ def init_alerts():
 	complaints_alerts = ComplaintsAlert(local, toncenter)
 	telemetry_alerts = TelemetryAlert(local, toncenter)
 	complaints_information = ComplaintsInformation(local, toncenter)
-	local.buffer.possible_alerts = [complaints_alerts, telemetry_alerts, complaints_information]
+	elections_information = ElectionsInformation(local, toncenter)
+	local.buffer.possible_alerts = [complaints_alerts, telemetry_alerts, complaints_information, elections_information]
 	local.buffer.possible_alerts_list = list()
 	for item in local.buffer.possible_alerts:
 		local.buffer.possible_alerts_list.append(type(item).__name__)
@@ -246,7 +248,7 @@ def add_notification_cmd(update, context):
 		notification = None
 	#end if
 
-	if len(notification) > 0:
+	if notification and len(notification) > 0:
 		local.db.notification = notification
 		output = "Notification added"
 	else:
@@ -319,7 +321,7 @@ def stop_notification_cmd(update, context):
 
 	local.db.notification = None
 	output = f"Stop notification sending by {username}"
-	send_message(user, output)
+	inform_admins(local, output)
 #end define
 
 def add_adnl_cmd(update, context):
@@ -412,7 +414,7 @@ def add_alert_cmd(update, context):
 
 def remove_alert_cmd(update, context):
 	user = User(local, update.effective_user.id)
-	user_alert_list = user.get_alert_list()
+	user_alert_list = user.get_alerts_list()
 	#user_alert_text = ", ".join(user_alert_list)
 
 	try:
@@ -435,7 +437,7 @@ def remove_alert_cmd(update, context):
 
 def alert_list_cmd(update, context):
 	user = User(local, update.effective_user.id)
-	user_alert_list = user.get_alert_list()
+	user_alert_list = user.get_alerts_list()
 	user_alert_text = ", ".join(user_alert_list)
 	output = f"User alerts: _{user_alert_text}_" + '\n'
 	output += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
@@ -482,18 +484,6 @@ def StatusList2Text(data):
 
 def Status2Text(item):
 	output = ""
-	# print("Status2Text.item:", json.dumps(item))
-	#label = item.get("label")
-	#adnl_addr = item.get("adnl_addr")
-	#adnl_short = item.get("adnl_short")
-	#is_validator = item.get("is_validator")
-	#is_send_telemetry = item.get("is_send_telemetry")
-	#telemetry_availability = item.get("telemetry_availability")
-	#isWorking = item.get("isWorking", "unknown")
-	#cpuLoad = item.get("cpuLoad")
-	#netLoad = item.get("netLoad")
-	#outOfSync = item.get("outOfSync")
-	#status_icon = item.get("status_icon")
 	if item.label:
 		output += f"Label:            {item.label}" + '\n'
 	output += f"ADNL:            {item.adnl_short}... `{item.status_icon}`" + '\n'
@@ -560,18 +550,20 @@ def get_validator_status(user, adnl_addr):
 
 	status = None
 	# Если нода отправляет телеметрию
-	if outOfSync is not None:
-		# Если рассинхронизация > 300, или эффективность < 10, или нода не работает
-		if outOfSync > 300 or isWorking is False:
+	if outOfSync != None:
+		# Если рассинхронизация > 300, или нода не работает
+		if outOfSync > 300 or isWorking == False:
 			status = False
 		else:
 			status = True
 	#end if
 
 	# Set status icon
-	if status is True:
+	if status == True and is_validator == True:
 		status_icon = "✅"
-	elif status is False:
+	elif status == True and is_validator == False:
+		status_icon = "☑️"
+	elif status == False:
 		status_icon = "❌"
 	else:
 		status_icon = ""
@@ -608,7 +600,7 @@ def try_scan_user_alerts(user):
 #end define
 
 def scan_user_alerts(user):
-	user_alert_list = user.get_alert_list()
+	user_alert_list = user.get_alerts_list()
 	for alert in local.buffer.possible_alerts:
 		if type(alert).__name__ in user_alert_list:
 			alert.check(user)
