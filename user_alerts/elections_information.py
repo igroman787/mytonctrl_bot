@@ -37,6 +37,8 @@ class ElectionsInformation:
 			if adnl_addr in user_participants_list:
 				continue
 			problem_adnl_list.append(adnl_addr)
+		if len(problem_adnl_list) == 0:
+			return
 		self.inform_after_start(user, election_data.election_id, problem_adnl_list)
 	#end define
 
