@@ -64,7 +64,7 @@ def init():
 	local.run()
 
 	# Start threads
-	local.start_cycle(message_sender, sec=1)
+	local.start_cycle(message_sender, sec=0.1)
 	local.start_cycle(scan_alerts, sec=60)
 #end define
 

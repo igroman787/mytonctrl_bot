@@ -67,7 +67,7 @@ class User:
 	#end define
 
 	def get_triggered_alerts_list(self):
-		return self.get_data_from_buffer("triggered_alerts_list")
+		return self.get_data_from_db("triggered_alerts_list")
 	#end define
 
 	def get_messages_list(self):

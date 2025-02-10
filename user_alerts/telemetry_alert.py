@@ -106,7 +106,7 @@ class TelemetryAlert:
 		text += "```"
 		user.add_message(text)
 		if direct is True:
-			triggered_alerts_list[alert_name] = self
+			triggered_alerts_list[alert_name] = get_timestamp()
 		else:
 			del triggered_alerts_list[alert_name]
 	#end define

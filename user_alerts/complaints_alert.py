@@ -39,6 +39,6 @@ class ComplaintsAlert:
 		alert_text += f"fine: {fine} TON" + '\n'
 		alert_text += "```"
 		user.add_message(alert_text)
-		triggered_alerts_list[alert_name] = self
+		triggered_alerts_list[alert_name] = get_timestamp()
 	#end define
 #end class

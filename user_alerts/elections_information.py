@@ -53,7 +53,7 @@ class ElectionsInformation:
 		stake = participant.stake // 10**9
 		text = f"Validator `{adnl_text}` sent stake: `{stake}` TON"
 		user.add_message(text)
-		triggered_alerts_list[alert_name] = self
+		triggered_alerts_list[alert_name] = get_timestamp()
 	#end define
 
 	def inform_after_start(self, user, election_id, problem_adnl_list):
@@ -69,7 +69,7 @@ class ElectionsInformation:
 			adnl_text = get_adnl_text(user, adnl_addr)
 			text += f"`{adnl_text}`" + '\n'
 		user.add_message(text)
-		triggered_alerts_list[alert_name] = self
+		triggered_alerts_list[alert_name] = get_timestamp()
 	#end define
 #end class
 

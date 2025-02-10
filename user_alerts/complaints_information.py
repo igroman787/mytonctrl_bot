@@ -50,7 +50,7 @@ class ComplaintsInformation:
 		#end define
 
 		user.add_message(text)
-		triggered_alerts_list[alert_name] = self
+		triggered_alerts_list[alert_name] = get_timestamp()
 	#end define
 
 	def do_inform(self, election_id, complaint):
