@@ -1,0 +1,5 @@
+🆘 *Node* `{adnl_short}`*: RAM overloaded*
+
+Node RAM usage greater than {threshold}%: *{value_percent}% ({value}GB / {max_value}GB).*
+
+ADNL: `{adnl}`

@@ -2,7 +2,7 @@
 # -*- coding: utf_8 -*-
 
 from mypylib.mypylib import get_timestamp
-from utils import get_adnl_text
+from utils import get_adnl_text, collect_template
 
 
 class ComplaintsAlert:
@@ -24,6 +24,20 @@ class ComplaintsAlert:
 	#end define
 
 	def warn(self, user, complaint):
+		alert_id = f"{type(self).__name__}-{complaint.election_id}-{complaint.adnl_addr}"
+		triggered_alerts_list = user.get_triggered_alerts_list()
+		if alert_id in triggered_alerts_list:
+			return
+		#end if
+		
+		adnl_short = get_adnl_text(user, complaint.adnl_addr)
+		penalty = complaint.suggested_fine // 10**9
+		alert_text = collect_template(self.local, "complaints_alert", adnl=complaint.adnl_addr, adnl_short=adnl_short, election_id=complaint.election_id, penalty=penalty)
+		user.add_message(alert_text)
+		triggered_alerts_list[alert_id] = get_timestamp()
+	#end define
+
+	def warn_old(self, user, complaint):
 		alert_name = f"{type(self).__name__}-{complaint.election_id}-{complaint.adnl_addr}"
 		triggered_alerts_list = user.get_triggered_alerts_list()
 		if alert_name in triggered_alerts_list:

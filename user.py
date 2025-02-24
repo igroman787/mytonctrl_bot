@@ -62,8 +62,8 @@ class User:
 		return self.get_data_from_db("labels")
 	#end define
 
-	def get_alerts_list(self):
-		return self.get_data_from_db("alerts_list", list)
+	def get_disable_alerts_list(self):
+		return self.get_data_from_db("disable_alerts_list", list)
 	#end define
 
 	def get_triggered_alerts_list(self):
@@ -118,14 +118,38 @@ class User:
 		user_labels[adnl] = label
 	#end define
 
-	def add_alert(self, name):
-		alerts_list = self.get_alerts_list()
-		error = self.check_entry_in_list(name, alerts_list)
+	def enable_alert(self, alert_name):
+		if alert_name not in self.local.buffer.possible_alerts_list:
+			return "Error, alert not found"
+		disable_alerts_list = self.get_disable_alerts_list()
+		if alert_name not in disable_alerts_list:
+			return f"Error, alert already enabled: _{alert_name}_"
+		del disable_alerts_list[alert_name]
+		text = f"Ok, alert enabled: _{alert_name}_"
+		return text
+	#end define
+
+	def disable_alert(self, alert_name):
+		if alert_name not in self.local.buffer.possible_alerts_list:
+			return "Error, alert not found"
+		disable_alerts_list = self.get_disable_alerts_list()
+		error = self.check_entry_in_list(alert_name, alerts_list)
 		if error:
 			return error
-		alerts_list.append(name)
-		text = f"Ok, alert added: _{name}_"
+		disable_alerts_list.append(alert_name)
+		text = f"Ok, alert disabled: _{alert_name}_"
 		return text
+	#end define
+
+	def get_alerts_list(self):
+		user_alerts_list = list()
+		disable_alerts_list = self.get_disable_alerts_list()
+		for alert in self.local.buffer.possible_alerts:
+			alert_name = type(alert).__name__
+			if alert_name in disable_alerts_list:
+				continue
+			user_alerts_list.append(alert)
+		return user_alerts_list
 	#end define
 
 	def check_entry_in_list(self, item, lst):

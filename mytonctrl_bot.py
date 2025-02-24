@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf_8 -*-
 
-import sys
-import time
+
 import json
 import urllib.request
+from os import listdir
+from sys import getsizeof
+from time import sleep
 from mypylib.mypylib import (
 	MyPyClass,
 	Dict,
@@ -29,7 +31,9 @@ from utils import (
 	get_config,
 	get_dict_from,
 	find_text_in_list,
-	get_item_from_list
+	get_item_from_list,
+	collect_template,
+	class_list2str_list
 )
 from user import (
 	User,
@@ -54,6 +58,7 @@ toncenter = Toncenter(local)
 def init():
 	init_alerts()
 	init_buffer()
+	init_templates()
 
 	# Load translate table
 	# local.InitTranslator(local.buffer.get("myDir") + "translate.json")
@@ -88,6 +93,15 @@ def init_buffer():
 	local.db.delay = data.delay if type(data.delay) == int else 60
 	local.buffer.admins = data.admins if type(data.admins) == list else list()
 	local.buffer.version = get_git_hash(local.buffer.my_dir, short=True)
+#end define
+
+def init_templates():
+	local.buffer.templates = Dict()
+	templates_dir = local.buffer.my_dir + "templates/"
+	for file_name in listdir(templates_dir): 
+		template_name, file_type = file_name.split('.')
+		file_path = templates_dir + file_name
+		local.buffer.templates[template_name] = read_file(file_path)
 #end define
 
 def message_sender():
@@ -132,14 +146,14 @@ def init_bot():
 	
 	start_handler = CommandHandler("start", start_cmd)
 	help_handler = CommandHandler("help", help_cmd)
-	status_handler = CommandHandler("status", status_cmd)
-	add_adnl_handler = CommandHandler("add_adnl", add_adnl_cmd)
-	add_fullnode_adnl_handler = CommandHandler("add_fullnode_adnl", add_fullnode_adnl_cmd)
-	remove_adnl_handler = CommandHandler("remove_adnl", remove_adnl_cmd)
-	adnl_list_handler = CommandHandler("adnl_list", adnl_list_cmd)
-	add_alert_handler = CommandHandler("add_alert", add_alert_cmd)
-	remove_alert_handler = CommandHandler("remove_alert", remove_alert_cmd)
-	alert_list_handler = CommandHandler("alert_list", alert_list_cmd)
+	#status_handler = CommandHandler("status", status_cmd)
+	subscribe_node_handler = CommandHandler("subscribe_node", subscribe_node_cmd)
+	#add_fullnode_adnl_handler = CommandHandler("add_fullnode_adnl", add_fullnode_adnl_cmd)
+	unsubscribe_node_handler = CommandHandler("unsubscribe_node", unsubscribe_node_cmd)
+	adnl_list_handler = CommandHandler("list_nodes", adnl_list_cmd)
+	enable_alert_handler = CommandHandler("enable_alert", enable_alert_cmd)
+	disable_alert_handler = CommandHandler("disable_alert", disable_alert_cmd)
+	alert_list_handler = CommandHandler("list_alerts", alerts_list_cmd)
 
 	me_handler = CommandHandler("me", me_cmd)
 	bot_handler = CommandHandler("bot", bot_cmd)
@@ -147,6 +161,7 @@ def init_bot():
 	print_notification_handler = CommandHandler("print_notification", print_notification_cmd)
 	start_notification_handler = CommandHandler("start_notification", start_notification_cmd)
 	stop_notification_handler = CommandHandler("stop_notification", stop_notification_cmd)
+	test_print_handler = CommandHandler("test_print", test_print_cmd)
 	
 
 	unknown_handler = MessageHandler(Filters.command, unknown_cmd)
@@ -156,13 +171,13 @@ def init_bot():
 	dispatcher.add_handler(echo_handler)
 	dispatcher.add_handler(start_handler)
 	dispatcher.add_handler(help_handler)
-	dispatcher.add_handler(status_handler)
-	dispatcher.add_handler(add_adnl_handler)
-	dispatcher.add_handler(add_fullnode_adnl_handler)
-	dispatcher.add_handler(remove_adnl_handler)
+	#dispatcher.add_handler(status_handler)
+	dispatcher.add_handler(subscribe_node_handler)
+	#dispatcher.add_handler(add_fullnode_adnl_handler)
+	dispatcher.add_handler(unsubscribe_node_handler)
 	dispatcher.add_handler(adnl_list_handler)
-	dispatcher.add_handler(add_alert_handler)
-	dispatcher.add_handler(remove_alert_handler)
+	dispatcher.add_handler(enable_alert_handler)
+	dispatcher.add_handler(disable_alert_handler)
 	dispatcher.add_handler(alert_list_handler)
 
 	dispatcher.add_handler(me_handler)
@@ -171,6 +186,7 @@ def init_bot():
 	dispatcher.add_handler(print_notification_handler)
 	dispatcher.add_handler(start_notification_handler)
 	dispatcher.add_handler(stop_notification_handler)
+	dispatcher.add_handler(test_print_handler)
 	
 
 	dispatcher.add_handler(unknown_handler)
@@ -194,15 +210,13 @@ def unknown_cmd(update, context):
 
 def start_cmd(update, context):
 	user = User(local, update.effective_user.id)
-	output = "This bot allows you to monitor the state of the validator." + '\n'
-	output += "For more information use command /help"
+	output = collect_template(local, "start")
 	send_message(user, output)
 #end define
 
 def help_cmd(update, context):
 	user = User(local, update.effective_user.id)
-	file_path = local.buffer.my_dir + "help.txt"
-	output = read_file(file_path)
+	output = collect_template(local, "help")
 	send_message(user, output)
 #end define
 
@@ -210,9 +224,73 @@ def me_cmd(update, context):
 	user = User(local, update.effective_user.id)
 	output = f"User: `{user.id}`" + '\n'
 	if user.is_admin() == True:
-		text = "Available commands: /add_notification, /print_notification, /start_notification, /stop_notification"
+		text = "Available admin commands: /add_notification, /print_notification, /start_notification, /stop_notification"
 		output += escape_markdown(text)
 	send_message(user, output)
+#end define
+
+def test_print_cmd(update, context):
+	user = User(local, update.effective_user.id)
+
+	adnl = "AABBCCDDEEFF0011223344556677889900112233445566778899AABBCCDDEEFF"
+	adnl = "CFB6E5AF514508527EDC8BD573B3EF9EEA09DD7227D9F3150D4E3B47DC87F19F"
+	telemetry_alerts = TelemetryAlert(local, toncenter)
+	complaints_alerts = ComplaintsAlert(local, toncenter)
+	elections_information = ElectionsInformation(local, toncenter)
+	complaints_information = ComplaintsInformation(local, toncenter)
+	value = 3600
+	upper_threshold = 40
+	lower_threshold = 20
+	telemetry_alerts.check_with_threshold(user, alert_name="Sync", adnl=adnl, value_for_comparison=value, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value)
+	value = 3
+	telemetry_alerts.check_with_threshold(user, alert_name="Sync", adnl=adnl, value_for_comparison=value, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value)
+	value = 15.13
+	max_value = 16
+	value_percent = round(value/max_value*100, 2)
+	upper_threshold = 90
+	lower_threshold = 80
+	telemetry_alerts.check_with_threshold(user, alert_name="CPU", adnl=adnl, value_for_comparison=value_percent, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value, value_percent=value_percent, max_value=max_value)
+	value = 7.21
+	value_percent = round(value/max_value*100, 2)
+	telemetry_alerts.check_with_threshold(user, alert_name="CPU", adnl=adnl, value_for_comparison=value_percent, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value, value_percent=value_percent, max_value=max_value)
+	value = 59.36
+	max_value = 64
+	value_percent = round(value/max_value*100, 2)
+	upper_threshold = 90
+	lower_threshold = 80
+	telemetry_alerts.check_with_threshold(user, alert_name="RAM", adnl=adnl, value_for_comparison=value_percent, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value, value_percent=value_percent, max_value=max_value)
+	value = 31.08
+	value_percent = round(value/max_value*100, 2)
+	telemetry_alerts.check_with_threshold(user, alert_name="RAM", adnl=adnl, value_for_comparison=value_percent, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value, value_percent=value_percent, max_value=max_value)
+	value = 580.81
+	upper_threshold = 500
+	lower_threshold = 450
+	telemetry_alerts.check_with_threshold(user, alert_name="Network", adnl=adnl, value_for_comparison=value, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value)
+	value = 420.23
+	telemetry_alerts.check_with_threshold(user, alert_name="Network", adnl=adnl, value_for_comparison=value, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value)
+	value = 46.31
+	value_percent = 92.46
+	upper_threshold = 90
+	lower_threshold = 80
+	telemetry_alerts.check_with_threshold(user, alert_name="Disk", adnl=adnl, value_for_comparison=value_percent, 
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value, value_percent=value_percent)
+	value = 48.72
+	value_percent = 79.9
+	telemetry_alerts.check_with_threshold(user, alert_name="Disk", adnl=adnl, value_for_comparison=value_percent,
+			upper_threshold=upper_threshold, lower_threshold=lower_threshold, value=value, value_percent=value_percent)
+	election_id = get_timestamp()
+	complaints_alerts.warn(user, complaint=Dict(adnl_addr=adnl, election_id=election_id, suggested_fine=101*10**9))
+	complaints_information.inform(user, election_id=election_id, utime_until=election_id+60, complaints=[Dict(adnl_addr=adnl, election_id=election_id, suggested_fine=101*10**9), Dict(adnl_addr=adnl, election_id=election_id, suggested_fine=101*10**9)])
+	elections_information.inform_before_start(user, election_id, participant=Dict(adnl_addr=adnl, stake=701000*10**9))
+	elections_information.inform_after_start(user, election_id, problem_adnl_list=[adnl])
 #end define
 
 def bot_cmd(update, context):
@@ -324,7 +402,7 @@ def stop_notification_cmd(update, context):
 	inform_admins(local, output)
 #end define
 
-def add_adnl_cmd(update, context):
+def subscribe_node_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
 	try:
@@ -348,7 +426,7 @@ def do_add_adnl_cmd(user, adnl, label):
 	send_message(user, output)
 #end define
 
-def remove_adnl_cmd(update, context):
+def unsubscribe_node_cmd(update, context):
 	user = User(local, update.effective_user.id)
 	user_adnl_list = user.get_adnl_list()
 	#user_adnl_list_text = ", ".join(user_adnl_list)
@@ -398,49 +476,41 @@ def add_fullnode_adnl_cmd(update, context):
 	send_message(user, output)
 #end define
 
-def add_alert_cmd(update, context):
+def enable_alert_cmd(update, context):
 	user = User(local, update.effective_user.id)
 
 	try:
 		alert_type = context.args[0]
 	except:
-		error = "Bad args. Usage: `add_alert <alert_type>`" + '\n'
+		error = "Bad args. Usage: `enable_alert <alert_type>`" + '\n'
 		error += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
 		send_message(user, error)
 		return
-	output = user.add_alert(alert_type)
+	output = user.enable_alert(alert_type)
 	send_message(user, output)
 #end define
 
-def remove_alert_cmd(update, context):
+def disable_alert_cmd(update, context):
 	user = User(local, update.effective_user.id)
-	user_alert_list = user.get_alerts_list()
-	#user_alert_text = ", ".join(user_alert_list)
 
 	try:
 		alert_type = context.args[0]
 	except:
-		error = "Bad args. Usage: `remove_alert <alert_type>`" + '\n'
-		#error += f"User alerts: _{user_alert_text}_"
+		error = "Bad args. Usage: `disable_alert <alert_type>`" + '\n'
 		send_message(user, error)
 		return
 	#end try
 
-	if alert_type in user_alert_list:
-		user_alert_list.remove(alert_type)
-		output = f"_{alert_type}_ is delated"
-	else:
-		output = f"_{alert_type}_ not found" + 'n'
-		#output += f"User alerts: _{user_alert_text}_"
+	output = user.disable_alert(alert_type)
 	send_message(user, output)
 #end define
 
-def alert_list_cmd(update, context):
+def alerts_list_cmd(update, context):
 	user = User(local, update.effective_user.id)
-	user_alert_list = user.get_alerts_list()
-	user_alert_text = ", ".join(user_alert_list)
-	output = f"User alerts: _{user_alert_text}_" + '\n'
-	output += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
+	user_alerts_list = user.get_alerts_list()
+	user_alerts_text = ", ".join(class_list2str_list(user_alerts_list))
+	output = f"User alerts: _{user_alerts_text}_" + '\n'
+	#output += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
 	send_message(user, output)
 #end define
 
@@ -600,10 +670,12 @@ def try_scan_user_alerts(user):
 #end define
 
 def scan_user_alerts(user):
-	user_alert_list = user.get_alerts_list()
-	for alert in local.buffer.possible_alerts:
-		if type(alert).__name__ in user_alert_list:
-			alert.check(user)
+	user_alerts_list = user.get_alerts_list()
+	#for alert in local.buffer.possible_alerts:
+		#if type(alert).__name__ in user_alerts_list:
+		#	alert.check(user)
+	for alert in user_alerts_list:
+		alert.check(user)
 #end define
 
 

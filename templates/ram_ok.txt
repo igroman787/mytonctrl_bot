@@ -1,0 +1,5 @@
+✅ *Node* `{adnl_short}`*: RAM ok*
+
+Node RAM usage is: *{value_percent}% ({value}GB / {max_value}GB).*
+
+ADNL: `{adnl}`

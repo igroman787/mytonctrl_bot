@@ -1,0 +1,5 @@
+🆘 *Node* `{adnl_short}`*: Disk overloaded*
+
+Node Disk usage usage greater than {threshold}%: *{value_percent}% ({value} MB/s).*
+
+ADNL: `{adnl}`

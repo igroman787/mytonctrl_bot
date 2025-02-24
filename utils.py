@@ -109,7 +109,20 @@ def get_adnl_text(user, adnl_addr):
 	user_labels = user.get_labels()
 	label = user_labels.get(adnl_addr)
 	label_text = f" ({label})" if label else ''
-	adnl_short = adnl_addr[0:7]
-	adnl_text = f"{adnl_short}...{label_text}"
+	adnl_short = adnl_addr[0:6] + "..." + adnl_addr[58:64]
+	adnl_text = f"{adnl_short}{label_text}"
 	return adnl_text
+#end define
+
+def collect_template(local, template_name, **kwargs):
+	template = local.buffer.templates.get(template_name)
+	return template.format(**kwargs)
+#end define
+
+def class_list2str_list(class_list):
+	result = list()
+	for item in class_list:
+		class_name = type(item).__name__
+		result.append(class_name)
+	return result
 #end define

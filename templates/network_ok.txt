@@ -1,0 +1,5 @@
+✅ *Node* `{adnl_short}`*: Network ok*
+
+Node Network usage is: *{value} Mbit/s*
+
+ADNL: `{adnl}`

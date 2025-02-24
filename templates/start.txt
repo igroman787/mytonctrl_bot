@@ -1,0 +1,30 @@
+This bot is for tracking the public status of the TON node/validator(s).
+
+Supported alerts:
+
+Telemetry
+
+— Node is out of sync
+— CPU is overloaded
+— Node's db usage is more than 80%
+— Network is overloaded
+— Disk is overloaded
+
+Fines
+
+— Validator has been fined in the last validation round
+
+Informational
+
+— Validator's sent (or not sent) stakes
+
+Network-wide
+
+— Announcements 
+— Software update requests
+— Requests for voting
+— All approved complaints for the last validation round.
+
+You can selectively disable certain notifications
+
+For more information please use /help command.
