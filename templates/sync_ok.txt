@@ -1,5 +1,5 @@
-✅ *Node* `{adnl_short}`*: Sync ok*
+✅ *Node* `{adnl_short}`*: Sync OK*
 
-Node Sync is: *{value} seconds.*
+Node sync: *{value} seconds*.
 
 ADNL: `{adnl}`

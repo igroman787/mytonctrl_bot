@@ -1,5 +1,5 @@
-🆘 *Node* `{adnl_short}`*: Sync overloaded*
+🆘 *Node* `{adnl_short}`*: Out of sync*
 
-Node Sync greater than {threshold} seconds: *{value} seconds.*
+Node out of sync greater than {threshold} seconds: *{value} seconds*.
 
 ADNL: `{adnl}`

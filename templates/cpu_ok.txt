@@ -1,5 +1,5 @@
-✅ *Node* `{adnl_short}`*: CPU ok*
+✅ *Node* `{adnl_short}`*: CPU OK*
 
-Node CPU usage is: *{value_percent}% ({value} / {max_value}).*
+Node CPU usage: *{value_percent}%* (*{value}* / *{max_value}*).
 
 ADNL: `{adnl}`

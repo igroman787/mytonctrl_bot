@@ -1,5 +1,5 @@
-✅ *Node* `{adnl_short}`*: RAM ok*
+✅ *Node* `{adnl_short}`*: RAM OK*
 
-Node RAM usage is: *{value_percent}% ({value}GB / {max_value}GB).*
+Node RAM usage: *{value_percent}%* (*{value}GB* / *{max_value}GB*).
 
 ADNL: `{adnl}`
