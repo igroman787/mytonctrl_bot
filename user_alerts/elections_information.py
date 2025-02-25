@@ -64,7 +64,7 @@ class ElectionsInformation:
 		#end if
 
 		user_labels = user.get_labels()
-		text = f"Validators don't sent stake for round `{election_id}`:" + '\n'
+		text = f"Validators didn't send stake for round `{election_id}`:" + '\n'
 		for adnl_addr in problem_adnl_list:
 			adnl_text = get_adnl_text(user, adnl_addr)
 			text += f"`{adnl_text}`" + '\n'

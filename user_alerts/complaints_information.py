@@ -61,8 +61,6 @@ class ComplaintsInformation:
 		triggered_alerts_list = user.get_triggered_alerts_list()
 		if alert_name in triggered_alerts_list:
 			return
-		if len(complaints) == 0:
-			return
 		#end if
 
 		text = f"*Penalties for round {election_id}*" + '\n'
@@ -73,6 +71,9 @@ class ComplaintsInformation:
 		for complaint in complaints:
 			text += self.do_inform(election_id, complaint)
 		#end define
+
+		if not len(complaints):
+			text += 'No poor performing validators in the round'
 
 		user.add_message(text)
 		triggered_alerts_list[alert_name] = get_timestamp()

@@ -1,6 +1,6 @@
 🆘 *Node* `{adnl_short}`*: Network overloaded*
 
-Node Network usage greater than {threshold} Mbit/s: *{value} Mbit/s*
+Node network usage greater than {threshold} Mbit/s: *{value} Mbit/s*.
 
 ADNL: `{adnl}`
 
