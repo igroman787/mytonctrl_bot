@@ -1,17 +1,17 @@
-To start using the bot, add the node/validator address to the watch list by /subscribe_node command:
+To start using the bot, add the node/validator address to the watch list by /subscribe\_node command:
 
 `/subscribe_node <NODE_ADNL_ADDRESS>`
 
-You can get the ADNL address in MyTonCtrl with the `/status` command.
+You can get the ADNL address in MyTonCtrl with the `status` command.
 
-/status - Show the status of the validators you are subscribed to
+/status - Show the status of the validators you are subscribed to.
 
-/unsubscribe_node - Remove node from subscriptions.
+/unsubscribe\_node - Remove node from subscriptions.
 
-/list_nodes - Show list of subscriptions.
+/list\_nodes - Show list of subscriptions.
 
-/enable_alert - Enable notification for all nodes.
+/enable\_alert - Enable notification for all nodes.
 
-/disable_alert - Enable notification for all nodes.
+/disable\_alert - Enable notification for all nodes.
 
-/list_alerts - Show list of active notifications for the node.
+/list\_alerts - Show list of active notifications for the node.
