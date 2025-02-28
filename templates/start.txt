@@ -2,7 +2,7 @@ This bot is for tracking the public status of the TON node/validator(s).
 
 Supported alerts:
 
-Telemetry
+*Telemetry*
 
 — Node is out of sync
 — CPU is overloaded
@@ -10,15 +10,15 @@ Telemetry
 — Network is overloaded
 — Disk is overloaded
 
-Fines
+*Fines*
 
 — Validator has been fined in the last validation round
 
-Informational
+*Informational*
 
-— Validator's sent (or not sent) stakes
+— Alerts for validator's sent (or not sent) stakes
 
-Network-wide
+*Network-wide*
 
 — Announcements 
 — Software update requests

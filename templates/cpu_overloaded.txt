@@ -1,5 +1,5 @@
 🆘 *Node* `{adnl_short}`*: CPU overloaded*
 
-Node CPU usage greater than {threshold}%: *{value_percent}% ({value} / {max_value}).*
+Node CPU usage greater than *{threshold}%*: *{value_percent}%* (*{value}* / *{max_value}*).
 
 ADNL: `{adnl}`

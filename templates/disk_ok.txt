@@ -1,5 +1,5 @@
-✅ *Node* `{adnl_short}`*: Disk ok*
+✅ *Node* `{adnl_short}`*: Disk OK*
 
-Node Disk usage is: *{value_percent}% ({value} MB/s).*
+Node disk usage: *{value_percent}%* (*{value} MB/s*).
 
 ADNL: `{adnl}`

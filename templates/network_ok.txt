@@ -1,5 +1,5 @@
-✅ *Node* `{adnl_short}`*: Network ok*
+✅ *Node* `{adnl_short}`*: Network OK*
 
-Node Network usage is: *{value} Mbit/s*
+Node network usage: *{value} Mbit/s*.
 
 ADNL: `{adnl}`
