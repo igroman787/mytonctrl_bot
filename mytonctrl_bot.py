@@ -2,8 +2,6 @@
 # -*- coding: utf_8 -*-
 
 
-import json
-import urllib.request
 from os import listdir
 from sys import getsizeof
 from time import sleep
@@ -301,8 +299,8 @@ def bot_cmd(update, context):
 	#end if
 
 	active_users = get_active_users(local)
-	db_size = round(sys.getsizeof(local.db)/10**6, 2)
-	buffer_size = round(sys.getsizeof(local.buffer)/10**6, 2)
+	db_size = round(getsizeof(local.db)/10**6, 2)
+	buffer_size = round(getsizeof(local.buffer)/10**6, 2)
 	output = f"version: `{local.buffer.version}`" + '\n'
 	output += f"users: `{len(active_users)}/{len(local.db.users)}`" + '\n'
 	output += f"db size: `{db_size} Mb`" + '\n'
