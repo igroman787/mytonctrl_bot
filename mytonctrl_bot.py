@@ -375,7 +375,7 @@ def start_notification_cmd(update, context):
 #end define
 
 def do_notification_sending():
-	time.sleep(local.db.delay)
+	sleep(local.db.delay)
 	if local.db.notification == None or len(local.db.notification) == 0:
 		return
 	#end if
