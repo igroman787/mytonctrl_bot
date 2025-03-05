@@ -3,7 +3,11 @@
 
 import time
 from mypylib.mypylib import get_timestamp
-from utils import with_buffer, get_adnl_text
+from utils import (
+	with_buffer,
+	get_adnl_text,
+	amount_formatting
+)
 
 
 class ElectionsInformation:
@@ -51,7 +55,8 @@ class ElectionsInformation:
 
 		adnl_text = get_adnl_text(user, participant.adnl_addr)
 		stake = participant.stake // 10**9
-		text = f"Validator `{adnl_text}` sent stake: `{stake}` TON"
+		stake_text = amount_formatting(stake)
+		text = f"Validator `{adnl_text}` sent stake: `{stake_text}` TON"
 		user.add_message(text)
 		triggered_alerts_list[alert_name] = get_timestamp()
 	#end define

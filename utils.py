@@ -126,3 +126,7 @@ def class_list2str_list(class_list):
 		result.append(class_name)
 	return result
 #end define
+
+def amount_formatting(amount):
+	return f"{amount:,}".replace(',', ' ')
+#end define

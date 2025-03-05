@@ -15,7 +15,7 @@ from mypylib.mypylib import (
 # Telegram components
 #pip3 install python-telegram-bot==13.7
 from telegram import Bot, ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Unauthorized
 from telegram.utils.helpers import escape_markdown
 from telegram.ext import (
 	Updater,
@@ -129,6 +129,11 @@ def do_send_message(user, text):
 			user.delete()
 		else:
 			raise BadRequest(ex)
+	except Unauthorized as ex:
+		if ex.message == "Forbidden: bot was blocked by the user":
+			user.delete()
+		else:
+			raise Unauthorized(ex)
 #end define
 
 def init_bot():
@@ -196,7 +201,7 @@ def echo_cmd(update, context):
 	#input = update.message.text
 	#input = context.args
 	user = User(local, update.effective_user.id)
-	output = "Technical support for validators: @mytonctrl_help_bot"
+	output = "The command must start with a slash character (`/`)."
 	send_message(user, escape_markdown(output))
 #end define
 
@@ -407,13 +412,13 @@ def subscribe_node_cmd(update, context):
 		adnl = context.args[0]
 		label = get_item_from_list(context.args, 1)
 	except:
-		error = "Bad args. Usage: `add_adnl <adnl> [<label>]`"
+		error = "Bad args. Usage: `/subscribe_node <adnl> [<label>]`"
 		send_message(user, error)
 		return
-	do_add_adnl_cmd(user, adnl, label)
+	do_subscribe_node_cmd(user, adnl, label)
 #end define
 
-def do_add_adnl_cmd(user, adnl, label):
+def do_subscribe_node_cmd(user, adnl, label):
 	#validators_list = toncenter.get_validators_list()
 	nodes_list = toncenter.get_nodes_list()
 	if adnl in nodes_list:
@@ -432,7 +437,7 @@ def unsubscribe_node_cmd(update, context):
 	try:
 		adnl = context.args[0]
 	except:
-		error = "Bad args. Usage: `remove_adnl <adnl>`" + '\n'
+		error = "Bad args. Usage: `/unsubscribe_node <adnl>`" + '\n'
 		#error += f"User adnl list: _{user_adnl_list_text}_"
 		send_message(user, error)
 		return
@@ -480,7 +485,7 @@ def enable_alert_cmd(update, context):
 	try:
 		alert_type = context.args[0]
 	except:
-		error = "Bad args. Usage: `enable_alert <alert_type>`" + '\n'
+		error = "Bad args. Usage: `/enable_alert <alert_type>`" + '\n'
 		error += f"Possible alerts: _{local.buffer.possible_alerts_text}_"
 		send_message(user, error)
 		return
@@ -494,7 +499,7 @@ def disable_alert_cmd(update, context):
 	try:
 		alert_type = context.args[0]
 	except:
-		error = "Bad args. Usage: `disable_alert <alert_type>`" + '\n'
+		error = "Bad args. Usage: `/disable_alert <alert_type>`" + '\n'
 		send_message(user, error)
 		return
 	#end try

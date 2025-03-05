@@ -2,7 +2,11 @@
 # -*- coding: utf_8 -*-
 
 from mypylib.mypylib import get_timestamp
-from utils import get_adnl_text, collect_template
+from utils import (
+	get_adnl_text,
+	collect_template,
+	amount_formatting
+)
 
 
 class ComplaintsAlert:
@@ -32,7 +36,8 @@ class ComplaintsAlert:
 		
 		adnl_short = get_adnl_text(user, complaint.adnl_addr)
 		penalty = complaint.suggested_fine // 10**9
-		alert_text = collect_template(self.local, "complaints_alert", adnl=complaint.adnl_addr, adnl_short=adnl_short, election_id=complaint.election_id, penalty=penalty)
+		penalty_text = amount_formatting(penalty)
+		alert_text = collect_template(self.local, "complaints_alert", adnl=complaint.adnl_addr, adnl_short=adnl_short, election_id=complaint.election_id, penalty=penalty_text)
 		user.add_message(alert_text)
 		triggered_alerts_list[alert_id] = get_timestamp()
 	#end define

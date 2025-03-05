@@ -3,7 +3,10 @@
 
 import time
 from mypylib.mypylib import get_timestamp
-from utils import collect_template
+from utils import (
+	collect_template,
+	amount_formatting
+)
 
 
 class ComplaintsInformation:
@@ -42,9 +45,10 @@ class ComplaintsInformation:
 		complaints_text = str()
 		for complaint in complaints:
 			penalty = complaint.suggested_fine // 10**9
+			penalty_text = amount_formatting(penalty)
 			validator = self.toncenter.get_validator(complaint.adnl_addr, past=True)
 			efficiency = self.toncenter.get_validator_efficiency(complaint.adnl_addr, election_id)
-			complaints_text += collect_template(self.local, "complaint", index=validator.index, adnl=complaint.adnl_addr, efficiency=efficiency, penalty=penalty)
+			complaints_text += collect_template(self.local, "complaint", index=validator.index, adnl=complaint.adnl_addr, efficiency=efficiency, penalty=penalty_text)
 			complaints_text += '\n'
 		if not len(complaints):
 			complaints_text += 'No poor performing validators in the round'
