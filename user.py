@@ -124,7 +124,8 @@ class User:
 		disable_alerts_list = self.get_disable_alerts_list()
 		if alert_name not in disable_alerts_list:
 			return f"Error, alert already enabled: _{alert_name}_"
-		del disable_alerts_list[alert_name]
+		alert_index = disable_alerts_list.index(alert_name)
+		del disable_alerts_list[alert_index]
 		text = f"Ok, alert enabled: _{alert_name}_"
 		return text
 	#end define
@@ -133,7 +134,7 @@ class User:
 		if alert_name not in self.local.buffer.possible_alerts_list:
 			return "Error, alert not found"
 		disable_alerts_list = self.get_disable_alerts_list()
-		error = self.check_entry_in_list(alert_name, alerts_list)
+		error = self.check_entry_in_list(alert_name, disable_alerts_list)
 		if error:
 			return error
 		disable_alerts_list.append(alert_name)
