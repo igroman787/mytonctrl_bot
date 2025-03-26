@@ -41,23 +41,4 @@ class ComplaintsAlert:
 		user.add_message(alert_text)
 		triggered_alerts_list[alert_id] = get_timestamp()
 	#end define
-
-	def warn_old(self, user, complaint):
-		alert_name = f"{type(self).__name__}-{complaint.election_id}-{complaint.adnl_addr}"
-		triggered_alerts_list = user.get_triggered_alerts_list()
-		if alert_name in triggered_alerts_list:
-			return
-		#end if
-		
-		adnl_text = get_adnl_text(user, complaint.adnl_addr)
-		fine = complaint.suggested_fine // 10**9
-		alert_text = "The validator has been fined:" + '\n'
-		alert_text += "```" + '\n'
-		alert_text += f"ADNL: {adnl_text}" + '\n'
-		alert_text += f"election: {complaint.election_id}" + '\n'
-		alert_text += f"fine: {fine} TON" + '\n'
-		alert_text += "```"
-		user.add_message(alert_text)
-		triggered_alerts_list[alert_name] = get_timestamp()
-	#end define
 #end class

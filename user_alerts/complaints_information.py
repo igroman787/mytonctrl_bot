@@ -59,40 +59,6 @@ class ComplaintsInformation:
 		user.add_message(inform_text)
 		triggered_alerts_list[alert_name] = get_timestamp()
 	#end define
-
-	def inform_old(self, user, election_id, utime_until, complaints):
-		alert_name = f"{type(self).__name__}-{election_id}"
-		triggered_alerts_list = user.get_triggered_alerts_list()
-		if alert_name in triggered_alerts_list:
-			return
-		#end if
-
-		text = f"*Penalties for round {election_id}*" + '\n'
-		text += f"Round's started: *{timestamp2utcdatetime(election_id)}*" + '\n'
-		text += f"Round's over: *{timestamp2utcdatetime(utime_until)}*" + '\n'
-		text += '\n'
-		
-		for complaint in complaints:
-			text += self.do_inform(election_id, complaint)
-		#end define
-
-		if not len(complaints):
-			text += 'No poor performing validators in the round'
-
-		user.add_message(text)
-		triggered_alerts_list[alert_name] = get_timestamp()
-	#end define
-
-	def do_inform(self, election_id, complaint):
-		validator = self.toncenter.get_validator(complaint.adnl_addr, past=True)
-		efficiency = self.toncenter.get_validator_efficiency(complaint.adnl_addr, election_id)
-		text = f"*Index: {validator.index}*" + '\n'
-		text += f"ANDL: `{validator.adnl_addr}`" + '\n'
-		text += f"Efficiency: *{int(efficiency)}%*" + '\n'
-		text += f"Penalty: *{complaint.suggested_fine//10**9} TON*" + '\n'
-		text += '\n'
-		return text
-	#end define
 #end class
 
 def timestamp2utcdatetime(timestamp, format="%d.%m.%Y %H:%M:%S"):

@@ -128,12 +128,12 @@ def do_send_message(user, text):
 		if ex.message == "Chat not found":
 			user.delete()
 		else:
-			raise BadRequest(ex)
+			local.add_log(f"do_send_message error: {ex}", "error")
 	except Unauthorized as ex:
 		if ex.message == "Forbidden: bot was blocked by the user":
 			user.delete()
 		else:
-			raise Unauthorized(ex)
+			local.add_log(f"do_send_message error: {ex}", "error")
 #end define
 
 def init_bot():
@@ -419,11 +419,14 @@ def subscribe_node_cmd(update, context):
 #end define
 
 def do_subscribe_node_cmd(user, adnl, label):
-	#validators_list = toncenter.get_validators_list()
+	validators_list = toncenter.get_validators_list()
 	nodes_list = toncenter.get_nodes_list()
-	if adnl in nodes_list:
+	adnl_list = validators_list + nodes_list
+	if adnl in adnl_list:
 		output = user.add_adnl(adnl)
 		user.add_label(adnl, label)
+		if adnl not in nodes_list:
+			output = f"Warning: Node don't send telemetry. Some functionality is unavailable. \n" + output
 	else:
 		output = f"_{adnl}_ not found"
 	send_message(user, output)
@@ -445,7 +448,7 @@ def unsubscribe_node_cmd(update, context):
 
 	if adnl in user_adnl_list:
 		user_adnl_list.remove(adnl)
-		output = f"_{adnl}_ is delated"
+		output = f"_{adnl}_ is deleted"
 	else:
 		output = f"_{adnl}_ not found" + 'n'
 		#output += f"User adnl list: _{user_adnl_list_text}_"

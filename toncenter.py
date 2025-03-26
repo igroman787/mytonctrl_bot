@@ -16,7 +16,8 @@ class Toncenter:
 		efficiency_list = self.get_efficiency_list(election_id=election_id)
 		for validator in efficiency_list:
 			if validator.adnl_addr == adnl:
-				return validator.efficiency
+				efficiency = round(validator.efficiency, 2)
+				return efficiency
 	#end define
 
 	def get_validator(self, adnl, past=False):
@@ -43,6 +44,8 @@ class Toncenter:
 			if node.adnl_address in result:
 				continue
 			result.append(node.adnl_address)
+		#with open("get_nodes_list.txt", 'wt') as file:
+		#	file.write(json.dumps(result, indent=4))
 		return result
 	#end define
 
@@ -111,8 +114,13 @@ class Toncenter:
 	def do_get_telemetry_list(self):
 		timestamp = get_timestamp()
 		url = f"https://telemetry.toncenter.com/getTelemetryData?timestamp_from={timestamp-100}&api_key={self.local.buffer.api_key}"
+		#print("do_get_telemetry_list url:", url)
 		text = try_get_url(url)
 		data = json.loads(text)
+		#with open("do_get_telemetry_list.txt", 'wt') as file:
+		#	file.write(json.dumps(data, indent=4))
+		#with open("do_get_telemetry_list_parse.txt", 'wt') as file:
+		#	file.write(json.dumps(parse_dicts_in_list(data), indent=4))
 		return parse_dicts_in_list(data)
 	#end define
 
